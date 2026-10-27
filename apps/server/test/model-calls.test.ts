@@ -2,15 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { LookSpecJsonSchema } from "@look-studio/shared";
 import {
-  BACKOFF_BASE_MS,
   MODEL_API_BASE_URL,
-  ExponentialBackoffRetryPolicy,
-  ModelError,
   callModelJson,
   callModelStructured,
   callModelWithImage,
 } from "../src/lib/model-client.ts";
 import type { FetchFn } from "../src/lib/model-client.ts";
+import { ModelError } from "../src/lib/model-errors.ts";
+import { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy } from "../src/lib/retry-policy.ts";
 
 const savedEnv = { ...process.env };
 

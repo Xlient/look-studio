@@ -1,10 +1,11 @@
-import OpenAI, { APIConnectionTimeoutError, APIError, APIUserAbortError } from "openai";
-import type { RetryOptions, RetryPolicy } from "@look-studio/shared";
+import OpenAI from "openai";
+import type { RetryPolicy } from "@look-studio/shared";
 import { envNumber, requiredEnv } from "../env.ts";
 import { logInfo } from "./logger.ts";
+import { ModelError, toModelError } from "./model-errors.ts";
+import { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy } from "./retry-policy.ts";
 
 export const MODEL_API_BASE_URL = "https://api.meta.ai/v1";
-export const BACKOFF_BASE_MS = 500;
 
 export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -16,158 +17,10 @@ export function modelMaxRetries(): number {
   return envNumber("MODEL_MAX_RETRIES", 3);
 }
 
-export function computeBackoffMs(
-  attempt: number,
-  random: () => number = Math.random,
-  baseMs: number = BACKOFF_BASE_MS,
-): number {
-  return baseMs * 2 ** attempt + random() * baseMs;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export interface RetryPolicyConfig {
-  maxRetries: number;
-  baseMs: number;
-}
-
-export class ExponentialBackoffRetryPolicy implements RetryPolicy {
-  private readonly config: () => RetryPolicyConfig;
-  private readonly wait: (ms: number) => Promise<void>;
-  private readonly random: () => number;
-
-  constructor(
-    config: () => RetryPolicyConfig = () => ({ maxRetries: modelMaxRetries(), baseMs: BACKOFF_BASE_MS }),
-    wait: (ms: number) => Promise<void> = sleep,
-    random: () => number = Math.random,
-  ) {
-    this.config = config;
-    this.wait = wait;
-    this.random = random;
-  }
-
-  async run<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
-    const { maxRetries, baseMs } = this.config();
-    for (let attempt = 0; ; attempt += 1) {
-      options.signal?.throwIfAborted();
-      try {
-        return await fn();
-      } catch (error) {
-        const retry = attempt < maxRetries && (options.shouldRetry?.(error) ?? false);
-        if (!retry) {
-          throw error;
-        }
-        const backoffMs = computeBackoffMs(attempt, this.random, baseMs);
-        await this.delay(Math.max(backoffMs, errorRetryAfterMs(error) ?? 0), options.signal);
-      }
-    }
-  }
-
-  private delay(ms: number, signal: AbortSignal | undefined): Promise<void> {
-    if (ms <= 0 || signal?.aborted) {
-      return Promise.resolve();
-    }
-    const active = signal;
-    if (active === undefined) {
-      return this.wait(ms);
-    }
-    return new Promise((resolve) => {
-      let settled = false;
-      const done = () => {
-        if (!settled) {
-          settled = true;
-          active.removeEventListener("abort", done);
-          resolve();
-        }
-      };
-      active.addEventListener("abort", done, { once: true });
-      void this.wait(ms).then(done, done);
-    });
-  }
-}
-
-export const defaultRetryPolicy: RetryPolicy = new ExponentialBackoffRetryPolicy();
-
-export type ModelErrorKind =
-  | "rate_limited"
-  | "timeout"
-  | "invalid_response"
-  | "aborted"
-  | "auth"
-  | "unavailable";
-
-export class ModelError extends Error {
-  readonly kind: ModelErrorKind;
-  readonly status: number | null;
-  readonly retryAfterMs: number | null;
-  readonly model: string;
-
-  constructor(
-    kind: ModelErrorKind,
-    fields: { model: string; status?: number | null; retryAfterMs?: number | null },
-  ) {
-    const status = fields.status ?? null;
-    super(status === null ? kind : `${kind} (status ${status})`);
-    this.name = "ModelError";
-    this.kind = kind;
-    this.status = status;
-    this.retryAfterMs = fields.retryAfterMs ?? null;
-    this.model = fields.model;
-  }
-}
-
-export function parseRetryAfterMs(value: string | null | undefined): number | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  const seconds = Number(value.trim());
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return null;
-  }
-  return seconds * 1000;
-}
-
-function errorRetryAfterMs(error: unknown): number | null {
-  if (typeof error === "object" && error !== null && "retryAfterMs" in error) {
-    const value = (error as { retryAfterMs?: unknown }).retryAfterMs;
-    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-      return value;
-    }
-  }
-  return null;
-}
-
-function toModelError(error: unknown, model: string, signal: AbortSignal | undefined): ModelError {
-  if (error instanceof ModelError) {
-    return error;
-  }
-  if (signal?.aborted || error instanceof APIUserAbortError) {
-    return new ModelError("aborted", { model });
-  }
-  if (error instanceof APIConnectionTimeoutError) {
-    return new ModelError("timeout", { model });
-  }
-  if (error instanceof APIError) {
-    const status = error.status ?? null;
-    if (error.status === 429) {
-      return new ModelError("rate_limited", {
-        model,
-        status,
-        retryAfterMs: parseRetryAfterMs(error.headers?.get("retry-after")),
-      });
-    }
-    if (error.status === 401 || error.status === 403) {
-      return new ModelError("auth", { model, status });
-    }
-    return new ModelError("unavailable", { model, status });
-  }
-  if (error instanceof SyntaxError) {
-    return new ModelError("invalid_response", { model });
-  }
-  return new ModelError("unavailable", { model });
-}
+export const defaultRetryPolicy: RetryPolicy = new ExponentialBackoffRetryPolicy(() => ({
+  maxRetries: modelMaxRetries(),
+  baseMs: BACKOFF_BASE_MS,
+}));
 
 function toTokenCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {

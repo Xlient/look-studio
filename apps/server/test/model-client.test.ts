@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { MODEL_API_BASE_URL, createModelClient } from "../src/lib/model-client.ts";
+import { ModelError, parseRetryAfterMs } from "../src/lib/model-errors.ts";
 import {
   BACKOFF_BASE_MS,
-  MODEL_API_BASE_URL,
   ExponentialBackoffRetryPolicy,
-  ModelError,
   computeBackoffMs,
-  createModelClient,
-  parseRetryAfterMs,
-} from "../src/lib/model-client.ts";
+} from "../src/lib/retry-policy.ts";
 
 describe("model client", () => {
   it("targets the Meta Model API", () => {

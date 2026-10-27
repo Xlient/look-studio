@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { toJSONSchema, z } from "zod";
 import { container } from "../container.ts";
-import { ModelError, callModelStructured } from "../lib/model-client.ts";
+import { callModelStructured } from "../lib/model-client.ts";
+import { ModelError } from "../lib/model-errors.ts";
 import { createSpendCapMiddleware, estimateCostUsd } from "../lib/spend-cap.ts";
 
 const PingResult = z.object({ pong: z.boolean() });
