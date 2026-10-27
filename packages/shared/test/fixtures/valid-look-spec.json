@@ -1,0 +1,22 @@
+{
+  "id": "look-1",
+  "name": "Studio casual",
+  "description": "Glasses plus a watch for the scaffold demo.",
+  "wearables": [
+    {
+      "id": "w-glasses-1",
+      "type": "glasses",
+      "label": "Round sunglasses",
+      "anchor": { "region": "face" }
+    },
+    {
+      "id": "w-watch-1",
+      "type": "watch",
+      "label": "Steel watch",
+      "anchor": { "region": "left-hand" }
+    }
+  ],
+  "palette": ["#111111", "#f5f5f5"],
+  "style": "casual",
+  "createdAt": "2026-10-26T00:00:00.000Z"
+}

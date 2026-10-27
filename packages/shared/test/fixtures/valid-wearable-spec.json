@@ -1,0 +1,9 @@
+{
+  "id": "w-glasses-1",
+  "type": "glasses",
+  "label": "Round sunglasses",
+  "assetUrl": "https://example.com/assets/glasses.glb",
+  "anchor": { "region": "face", "offset": { "x": 0, "y": 0.02, "z": 0.05 } },
+  "scale": 1,
+  "visible": true
+}

@@ -1,0 +1,5 @@
+{
+  "op": "move",
+  "targetId": "w-glasses-1",
+  "delta": { "x": 0, "y": 0.01, "z": 0 }
+}

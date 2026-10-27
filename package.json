@@ -1,0 +1,22 @@
+{
+  "name": "look-studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,server -c blue,green \"pnpm --filter @look-studio/web dev\" \"pnpm --filter @look-studio/server dev\"",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "eval": "node eval/run.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.6",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}

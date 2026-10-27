@@ -1,0 +1,9 @@
+{
+  "lookId": "look-1",
+  "score": 82,
+  "summary": "Balanced casual look; watch and glasses pair well.",
+  "issues": [
+    { "code": "palette-contrast", "message": "Palette has low contrast.", "severity": "info" }
+  ],
+  "suggestions": ["Try a darker frame."]
+}

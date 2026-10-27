@@ -1,0 +1,6 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "packages/core"
+minimumReleaseAgeExclude:
+  - openai@7.45.0
