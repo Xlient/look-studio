@@ -13,3 +13,4 @@ coverage/
 secrets/
 .DS_Store
 *.local
+docs/
