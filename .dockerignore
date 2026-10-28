@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/test
+**/e2e
+.env
+.env.*
+.git
+.github
+.claude
+docs
+eval
+*.log
+*.pem
+*.key
+secrets/
+firebaseconfig.js
