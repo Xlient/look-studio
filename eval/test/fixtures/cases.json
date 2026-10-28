@@ -1,0 +1,5 @@
+[
+  { "id": "a", "input": "hello" },
+  { "id": "b", "input": "boom" },
+  { "id": "c", "input": "x,y \"q\"" }
+]
