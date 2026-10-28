@@ -252,6 +252,30 @@ describe("model call logging", () => {
     expect(typeof fields["latencyMs"]).toBe("number");
   });
 
+  it("sends the reasoning effort and logs reasoning tokens", async () => {
+    process.env.MODEL_API_KEY = "test-key-1";
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const captured: CapturedCall[] = [];
+    const reply = jsonResponse({
+      id: "resp_r",
+      usage: { input_tokens: 10, output_tokens: 50, total_tokens: 60, output_tokens_details: { reasoning_tokens: 40 } },
+      output_text: '{"pong":true}',
+    }, 200);
+    await callModelStructured<{ pong: boolean }>(baseOptions({ reasoningEffort: "low" as const, fetch: scriptedFetch([reply], captured) }));
+    expect(captured[0]?.body["reasoning"]).toEqual({ effort: "low" });
+    const fields = JSON.parse(String(spy.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(fields["reasoningTokens"]).toBe(40);
+    expect(fields["reasoningEffort"]).toBe("low");
+  });
+
+  it("omits reasoning when no effort is set", async () => {
+    process.env.MODEL_API_KEY = "test-key-1";
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const captured: CapturedCall[] = [];
+    await callModelStructured<{ pong: boolean }>(baseOptions({ fetch: scriptedFetch([modelResponse('{"pong":true}')], captured) }));
+    expect(captured[0]?.body).not.toHaveProperty("reasoning");
+  });
+
   it("logs one line with the error kind on failure", async () => {
     process.env.MODEL_API_KEY = "test-key-1";
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});

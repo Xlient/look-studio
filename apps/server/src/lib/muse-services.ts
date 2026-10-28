@@ -1,7 +1,8 @@
 import type { BudgetTracker, EditCommand, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { EditDraft, EditDraftJsonSchema, buildEditPrompt, draftToEditCommand } from "./edit-draft.ts";
 import { LookDraft, LookDraftJsonSchema, buildLookPrompt, draftToLookSpec } from "./look-draft.ts";
-import { callModelStructured, callModelWithImage } from "./model-client.ts";
+import { envString } from "../env.ts";
+import { ReasoningEffort, callModelStructured, callModelWithImage } from "./model-client.ts";
 import type { FetchFn, StructuredCallResult } from "./model-client.ts";
 import { ModelError } from "./model-errors.ts";
 import { createFieldStreamer } from "./partial-json.ts";
@@ -18,6 +19,15 @@ import { estimateCostUsd } from "./spend-cap.ts";
 
 // Standard-mode model approved for inputs that may contain a face.
 export const MUSE_SPARK_MODEL = "muse-spark-1.3";
+
+// Muse Spark reasons for ~1,500 tokens by default before any visible text, which stalls streaming.
+export function lookReasoningEffort(): ReasoningEffort {
+  const parsed = ReasoningEffort.safeParse(envString("LOOK_REASONING_EFFORT", "low"));
+  if (!parsed.success) {
+    throw new Error("LOOK_REASONING_EFFORT must be minimal, low, medium, or high");
+  }
+  return parsed.data;
+}
 
 export interface MuseServiceDeps {
   readonly retryPolicy: RetryPolicy;
@@ -65,6 +75,7 @@ export class MuseLookService implements LookService {
       signal,
       retryPolicy: this.deps.retryPolicy,
       fetch: this.deps.fetch,
+      reasoningEffort: lookReasoningEffort(),
       ...(onDescription === undefined ? {} : { onTextDelta: createFieldStreamer("description", onDescription) }),
     };
     const result =
