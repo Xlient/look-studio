@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { LookSpec } from "@look-studio/shared";
 import App from "../src/App.tsx";
 import CameraPreview from "../src/components/CameraPreview.tsx";
-import PlaceholderPanel from "../src/components/PlaceholderPanel.tsx";
+import BuddyChat from "../src/components/BuddyChat.tsx";
+import ModelMonitor from "../src/components/ModelMonitor.tsx";
 
 function listFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -16,7 +17,8 @@ describe("web smoke", () => {
   it("exports the page components", () => {
     expect(typeof App).toBe("function");
     expect(typeof CameraPreview).toBe("function");
-    expect(typeof PlaceholderPanel).toBe("function");
+    expect(typeof BuddyChat).toBe("function");
+    expect(typeof ModelMonitor).toBe("function");
   });
 
   it("never references the server model key in client sources", () => {

@@ -1,0 +1,107 @@
+import type { BudgetTracker, EditCommand, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
+import { EditDraft, EditDraftJsonSchema, buildEditPrompt, draftToEditCommand } from "./edit-draft.ts";
+import { LookDraft, LookDraftJsonSchema, buildLookPrompt, draftToLookSpec } from "./look-draft.ts";
+import { callModelStructured, callModelWithImage } from "./model-client.ts";
+import type { FetchFn, StructuredCallResult } from "./model-client.ts";
+import { ModelError } from "./model-errors.ts";
+import { EditUnresolvedError } from "./services.ts";
+import type {
+  EditRequest,
+  EditService,
+  LookRequest,
+  LookService,
+  ModelCallMeta,
+  ServiceResult,
+} from "./services.ts";
+import { estimateCostUsd } from "./spend-cap.ts";
+
+// Standard-mode model approved for inputs that may contain a face.
+export const MUSE_SPARK_MODEL = "muse-spark-1.3";
+
+export interface MuseServiceDeps {
+  readonly retryPolicy: RetryPolicy;
+  readonly rateLimiter: RateLimiter;
+  readonly budget: BudgetTracker;
+  readonly newId: () => string;
+  readonly fetch?: FetchFn;
+}
+
+function acquire(limiter: RateLimiter, model: string): void {
+  const decision = limiter.tryAcquire(model, 1);
+  if (!decision.allowed) {
+    throw new ModelError("rate_limited", { model, retryAfterMs: decision.retryAfterMs });
+  }
+}
+
+function toMeta(result: StructuredCallResult<unknown>): ModelCallMeta {
+  return {
+    model: result.model,
+    latencyMs: result.latencyMs,
+    tokens: result.tokens,
+    requestId: result.requestId,
+    attempts: result.attempts,
+  };
+}
+
+export class MuseLookService implements LookService {
+  private readonly deps: MuseServiceDeps;
+
+  constructor(deps: MuseServiceDeps) {
+    this.deps = deps;
+  }
+
+  async createLook(request: LookRequest, signal: AbortSignal): Promise<ServiceResult<LookSpec>> {
+    acquire(this.deps.rateLimiter, MUSE_SPARK_MODEL);
+    const options = {
+      model: MUSE_SPARK_MODEL,
+      prompt: buildLookPrompt(request.chat, request.image !== undefined),
+      schemaName: "look_draft",
+      schema: LookDraftJsonSchema,
+      signal,
+      retryPolicy: this.deps.retryPolicy,
+      fetch: this.deps.fetch,
+    };
+    const result =
+      request.image === undefined
+        ? await callModelStructured<unknown>(options)
+        : await callModelWithImage<unknown>({ ...options, images: [{ dataUrl: request.image }] });
+    this.deps.budget.record(estimateCostUsd(result.tokens.total));
+    const draft = LookDraft.safeParse(result.data);
+    const look = draft.success ? draftToLookSpec(draft.data, `look-${this.deps.newId()}`) : null;
+    if (look === null) {
+      throw new ModelError("invalid_response", { model: MUSE_SPARK_MODEL });
+    }
+    return { data: look, meta: toMeta(result) };
+  }
+}
+
+export class MuseEditService implements EditService {
+  private readonly deps: MuseServiceDeps;
+
+  constructor(deps: MuseServiceDeps) {
+    this.deps = deps;
+  }
+
+  async edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditCommand>> {
+    acquire(this.deps.rateLimiter, MUSE_SPARK_MODEL);
+    const result = await callModelStructured<unknown>({
+      model: MUSE_SPARK_MODEL,
+      prompt: buildEditPrompt(request.utterance, request.look),
+      schemaName: "edit_draft",
+      schema: EditDraftJsonSchema,
+      signal,
+      retryPolicy: this.deps.retryPolicy,
+      fetch: this.deps.fetch,
+    });
+    this.deps.budget.record(estimateCostUsd(result.tokens.total));
+    const draft = EditDraft.safeParse(result.data);
+    if (!draft.success) {
+      throw new ModelError("invalid_response", { model: MUSE_SPARK_MODEL });
+    }
+    const command = draftToEditCommand(draft.data, request.look, `${request.look.id}-w-${this.deps.newId()}`);
+    if (command === null) {
+      throw new EditUnresolvedError();
+    }
+    return { data: command, meta: toMeta(result) };
+  }
+}

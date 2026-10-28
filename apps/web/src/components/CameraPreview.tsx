@@ -1,82 +1,171 @@
 import { useEffect, useRef, useState } from "react";
+import type { LookSpec } from "@look-studio/shared";
+import {
+  listVideoDevices,
+  mapGetUserMediaError,
+  mediaDevicesAvailable,
+  startCamera,
+  statusMessage,
+  stopStream,
+} from "../tracking/camera.ts";
+import type { CameraStatus, VideoDevice } from "../tracking/camera.ts";
+import Window from "./Window.tsx";
 
-type CameraState = "idle" | "requesting" | "granted" | "denied" | "unavailable" | "error";
-
-export default function CameraPreview() {
+export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [state, setState] = useState<CameraState>("idle");
-  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<CameraStatus>("prompt");
+  const [devices, setDevices] = useState<VideoDevice[]>([]);
+  const [deviceId, setDeviceId] = useState("");
+  const [sampleUrl, setSampleUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    void refreshDevices();
     return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      stopStream(streamRef.current);
       streamRef.current = null;
     };
   }, []);
 
+  useEffect(() => {
+    if (sampleUrl !== null) {
+      videoRef.current?.play().catch(() => {});
+      return () => URL.revokeObjectURL(sampleUrl);
+    }
+  }, [sampleUrl]);
+
+  const refreshDevices = async () => {
+    try {
+      setDevices(await listVideoDevices());
+    } catch {
+      setDevices([]);
+    }
+  };
+
   const stop = () => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    stopStream(streamRef.current);
     streamRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    setSampleUrl(null);
   };
 
   const enable = async () => {
-    if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
-      setState("unavailable");
-      setMessage("Camera is unavailable here (needs HTTPS or localhost plus a camera device).");
+    if (!mediaDevicesAvailable()) {
+      setStatus("no-device");
       return;
     }
-    setState("requesting");
-    setMessage("");
+    stop();
+    setStatus("requesting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await startCamera(deviceId === "" ? undefined : deviceId);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
       }
-      setState("granted");
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : "";
-      if (name === "NotAllowedError" || name === "SecurityError") {
-        setState("denied");
-        setMessage("Camera permission was denied. Allow camera access in the browser, then try again.");
-      } else {
-        setState("error");
-        setMessage(err instanceof Error ? err.message : "Could not start the camera.");
-      }
+      setStatus("live");
+      await refreshDevices();
+    } catch (error) {
+      const failure = mapGetUserMediaError(error);
+      setStatus(failure === "unknown" ? "error" : failure);
     }
   };
 
   const disable = () => {
     stop();
-    setState("idle");
-    setMessage("");
+    setStatus("prompt");
   };
 
+  const playSample = (file: File | undefined) => {
+    if (file === undefined) {
+      return;
+    }
+    stop();
+    setSampleUrl(URL.createObjectURL(file));
+    setStatus("sample");
+  };
+
+  const selectable = devices.filter((device) => device.deviceId !== "");
+
+  const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
+  const showing = status === "live" || status === "sample";
+
   return (
-    <section className="card" aria-label="Camera preview">
-      <h2>Camera preview</h2>
-      <div className="video-wrap">
-        <video ref={videoRef} muted playsInline />
-        {state !== "granted" && <div className="video-fallback">Camera off</div>}
-      </div>
-      {message !== "" && <p className="notice">{message}</p>}
-      <div className="row">
-        {state === "granted" ? (
-          <button type="button" onClick={disable}>
-            Turn off camera
+    <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
+      <div className="player">
+        <div className="player__screen">
+          <video
+            ref={videoRef}
+            src={sampleUrl ?? undefined}
+            muted
+            playsInline
+            controls={status === "sample"}
+            aria-label="Camera preview"
+          />
+          {!showing && (
+            <div className="player__idle">
+              <span className="player__idle-logo" aria-hidden="true">◉</span>
+              <span>NO SIGNAL</span>
+            </div>
+          )}
+          {look !== null && showing && (
+            <div className="player__ticker" aria-hidden="true">
+              <span>
+                NOW WEARING: {look.name}
+                {wearing.length > 0 && ` ✦ ${wearing.join(" ✦ ")}`}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="player__lcd" role="status">
+          <span className={`led ${status === "live" ? "led--on" : ""}`} aria-hidden="true" />
+          {statusMessage(status)}
+        </div>
+        <div className="player__deck">
+          {status === "live" ? (
+            <>
+              <button type="button" className="btn" onClick={() => void enable()}>
+                ⟲ Restart
+              </button>
+              <button type="button" className="btn" onClick={disable}>
+                ■ Stop
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn--play" onClick={() => void enable()} disabled={status === "requesting"}>
+              {status === "requesting" ? "Requesting…" : "▶ Start camera"}
+            </button>
+          )}
+          <label className="btn btn--file">
+            Sample video
+            <input
+              type="file"
+              accept="video/*"
+              className="sr-only"
+              onChange={(event) => {
+                playSample(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <div className="player__source">
+          <label htmlFor="camera-device">Source</label>
+          <select id="camera-device" value={deviceId} onChange={(event) => setDeviceId(event.target.value)}>
+            <option value="">Default camera</option>
+            {selectable.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn btn--small" onClick={() => void refreshDevices()}>
+            Refresh
           </button>
-        ) : (
-          <button type="button" onClick={enable} disabled={state === "requesting"}>
-            {state === "requesting" ? "Requesting…" : "Enable camera"}
-          </button>
-        )}
-        <span className="status">Status: {state}</span>
+        </div>
       </div>
-    </section>
+    </Window>
   );
 }
