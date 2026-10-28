@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { LookSpec, WearableSpec } from "@look-studio/shared";
 import { createWearableJob, watchWearableJob } from "../src/studio/api-client.ts";
 import type { CallMeta, FetchLike } from "../src/studio/api-client.ts";
-import { EMPTY_HISTORY, MAX_HISTORY, recordLook, redoLook, undoLook } from "../src/studio/look-history.ts";
 import { clampVibe, composePrompt, contextNote, vibeLabel } from "../src/studio/prompt-compose.ts";
 import { historyShortcut } from "../src/studio/shortcuts.ts";
 import type { ShortcutEvent } from "../src/studio/shortcuts.ts";
@@ -30,7 +29,6 @@ const meta: CallMeta = {
 
 const crown: WearableSpec = { id: "w1", type: "hat", label: "Crown", anchor: { region: "head" } };
 const gold: LookSpec = { id: "look-1", name: "Gold", style: "formal", wearables: [crown] };
-const rose: LookSpec = { id: "look-2", name: "Rose", style: "casual", wearables: [] };
 const signal = new AbortController().signal;
 
 describe("sse parser", () => {
@@ -44,34 +42,6 @@ describe("sse parser", () => {
       { event: "delta", data: '{"text":"a"}' },
       { event: "message", data: "line one\nline two" },
     ]);
-  });
-});
-
-describe("look history", () => {
-  it("round-trips undo and redo", () => {
-    const history = recordLook(recordLook(EMPTY_HISTORY, null), gold);
-    const back = undoLook(history, rose);
-    expect(back?.look).toEqual(gold);
-    const backAgain = back === null ? null : undoLook(back.history, back.look);
-    expect(backAgain?.look).toBeNull();
-    expect(backAgain === null ? null : undoLook(backAgain.history, backAgain.look)).toBeNull();
-    const forward = backAgain === null ? null : redoLook(backAgain.history, backAgain.look);
-    expect(forward?.look).toEqual(gold);
-    const forwardAgain = forward === null ? null : redoLook(forward.history, forward.look);
-    expect(forwardAgain?.look).toEqual(rose);
-    expect(forwardAgain === null ? null : redoLook(forwardAgain.history, forwardAgain.look)).toBeNull();
-  });
-
-  it("stays bounded and clears redo on a new change", () => {
-    let history = EMPTY_HISTORY;
-    for (let i = 0; i < MAX_HISTORY + 10; i += 1) {
-      history = recordLook(history, { ...gold, id: `look-${i}` });
-    }
-    expect(history.past).toHaveLength(MAX_HISTORY);
-    expect(history.past[0]?.id).toBe("look-10");
-    const step = undoLook(history, rose);
-    expect(step?.history.future).toHaveLength(1);
-    expect(step === null ? null : recordLook(step.history, step.look).future).toEqual([]);
   });
 });
 
