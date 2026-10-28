@@ -28,7 +28,7 @@ Run these yourself. Replace `PROJECT_ID`, `PROJECT_NUMBER` and `GITHUB_REPO` (`X
 5. Create the deploy service account and grant its roles:
    ```bash
    gcloud iam service-accounts create github-deploy --project PROJECT_ID
-   for role in roles/run.admin roles/artifactregistry.writer roles/firebasehosting.admin roles/iam.serviceAccountUser roles/run.viewer; do
+   for role in roles/run.admin roles/artifactregistry.writer roles/firebasehosting.admin roles/iam.serviceAccountUser roles/run.viewer roles/serviceusage.serviceUsageConsumer; do
      gcloud projects add-iam-policy-binding PROJECT_ID --member "serviceAccount:github-deploy@PROJECT_ID.iam.gserviceaccount.com" --role "$role"
    done
    ```
