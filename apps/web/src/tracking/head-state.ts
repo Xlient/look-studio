@@ -20,9 +20,11 @@ export interface FaceSample {
 }
 
 export function createHeadState(): HeadState {
+  const pose = new Float32Array(16);
+  pose[0] = pose[5] = pose[10] = pose[15] = 1;
   return {
     landmarks: new Float32Array(LANDMARK_COUNT * 3),
-    pose: new Float32Array(16),
+    pose,
     landmarkCount: 0,
     confidence: 0,
     timestampMs: 0,
