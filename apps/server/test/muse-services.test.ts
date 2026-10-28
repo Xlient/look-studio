@@ -26,7 +26,18 @@ const lookDraft = {
   description: "Warm gold.",
   style: "formal",
   palette: ["#FFD700"],
-  wearables: [{ type: "hat", label: "Crown", region: "head", scale: 1 }],
+  wearables: [{ type: "hat", label: "Crown", region: "head", scale: 1 }],  makeup: {
+    lipColor: "#c2185b",
+    lipOpacity: 0.7,
+    lipFinish: "gloss",
+    blushColor: "#ff8a80",
+    blushOpacity: 0.3,
+    shadowColor: "#7e57c2",
+    shadowOpacity: 0.5,
+    shadowFinish: "shimmer",
+    browColor: "#4e342e",
+    browOpacity: 0.4,
+  },
 };
 
 const look: LookSpec = {

@@ -1,5 +1,6 @@
 import {
   AmbientLight,
+  CanvasTexture,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
@@ -15,7 +16,6 @@ import {
   Scene,
   SphereGeometry,
   SRGBColorSpace,
-  VideoTexture,
   WebGLRenderer,
 } from "three";
 import type { HeadAnchor } from "./head-anchor.ts";
@@ -51,7 +51,7 @@ function buildCrown(): Group {
   return crown;
 }
 
-export function createLookScene(canvas: HTMLCanvasElement, video: HTMLVideoElement): LookScene {
+export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLCanvasElement): LookScene {
   const renderer = new WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(1);
@@ -60,7 +60,7 @@ export function createLookScene(canvas: HTMLCanvasElement, video: HTMLVideoEleme
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10_000);
   camera.position.set(0, 0, 5_000);
 
-  const texture = new VideoTexture(video);
+  const texture = new CanvasTexture(backdropSource);
   texture.colorSpace = SRGBColorSpace;
   const backdrop = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: texture, depthWrite: false }));
   backdrop.position.set(0, 0, -4_000);
@@ -95,6 +95,7 @@ export function createLookScene(canvas: HTMLCanvasElement, video: HTMLVideoEleme
       backdrop.scale.set(mirror ? -width : width, backdrop.scale.y, 1);
     },
     render(anchor) {
+      texture.needsUpdate = true;
       crown.visible = anchor.visible;
       if (anchor.visible) {
         rotation.extractRotation(pose.fromArray(anchor.rotation));

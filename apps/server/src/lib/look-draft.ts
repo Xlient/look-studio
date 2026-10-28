@@ -1,6 +1,6 @@
 import { toJSONSchema, z } from "zod";
-import { AnchorRegion, HexColor, LookSpec, LookStyle, WearableType } from "@look-studio/shared";
-import type { WearableSpec } from "@look-studio/shared";
+import { AnchorRegion, HexColor, LipFinish, LookSpec, LookStyle, ShadowFinish, WearableType } from "@look-studio/shared";
+import type { Makeup, WearableSpec } from "@look-studio/shared";
 
 export const MAX_DRAFT_WEARABLES = 4;
 export const MAX_PALETTE = 5;
@@ -13,12 +13,29 @@ export const DraftWearable = z.object({
 });
 export type DraftWearable = z.infer<typeof DraftWearable>;
 
+export const DraftMakeup = z.object({
+  lipColor: z.string(),
+  lipOpacity: z.number(),
+  lipFinish: LipFinish,
+  blushColor: z.string(),
+  blushOpacity: z.number(),
+  shadowColor: z.string(),
+  shadowOpacity: z.number(),
+  shadowFinish: ShadowFinish,
+  browColor: z.string(),
+  browOpacity: z.number(),
+});
+export type DraftMakeup = z.infer<typeof DraftMakeup>;
+
+export const MAKEUP_OPACITY_CAP = { lips: 0.85, blush: 0.45, eyeshadow: 0.65, brows: 0.5 } as const;
+
 export const LookDraft = z.object({
   name: z.string(),
   description: z.string(),
   style: LookStyle,
   palette: z.array(z.string()),
   wearables: z.array(DraftWearable),
+  makeup: DraftMakeup,
 });
 export type LookDraft = z.infer<typeof LookDraft>;
 
@@ -35,6 +52,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     "Design one look from the user's request.",
     `- wearables: at most ${MAX_DRAFT_WEARABLES} virtual 3D props, each anchored to a body region; scale 1 is natural size.`,
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
+    "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
     "- name: two to four catchy words. description: one or two sentences.",
     hasImage
       ? "A reference photo is attached. Use only its colours, accessories, and overall style."
@@ -67,18 +85,42 @@ export function toWearableSpec(draft: DraftWearable, id: string): WearableSpec {
   };
 }
 
+function tint(color: string, opacity: number, cap: number): { color: string; opacity: number } | null {
+  const hex = color.trim();
+  if (!HexColor.safeParse(hex).success || !Number.isFinite(opacity) || opacity <= 0) {
+    return null;
+  }
+  return { color: hex, opacity: Math.min(cap, opacity) };
+}
+
+export function toMakeup(draft: DraftMakeup): Makeup | undefined {
+  const lips = tint(draft.lipColor, draft.lipOpacity, MAKEUP_OPACITY_CAP.lips);
+  const blush = tint(draft.blushColor, draft.blushOpacity, MAKEUP_OPACITY_CAP.blush);
+  const eyeshadow = tint(draft.shadowColor, draft.shadowOpacity, MAKEUP_OPACITY_CAP.eyeshadow);
+  const brows = tint(draft.browColor, draft.browOpacity, MAKEUP_OPACITY_CAP.brows);
+  const makeup: Makeup = {
+    ...(lips === null ? {} : { lips: { ...lips, finish: draft.lipFinish } }),
+    ...(blush === null ? {} : { blush }),
+    ...(eyeshadow === null ? {} : { eyeshadow: { ...eyeshadow, finish: draft.shadowFinish } }),
+    ...(brows === null ? {} : { brows }),
+  };
+  return Object.keys(makeup).length === 0 ? undefined : makeup;
+}
+
 export function draftToLookSpec(draft: LookDraft, lookId: string): LookSpec | null {
   const palette = draft.palette
     .map((color) => color.trim())
     .filter((color) => HexColor.safeParse(color).success)
     .slice(0, MAX_PALETTE);
   const description = draft.description.trim().slice(0, 500);
+  const makeup = toMakeup(draft.makeup);
   const candidate = {
     id: lookId,
     name: clampText(draft.name, 80, "Untitled look"),
     ...(description === "" ? {} : { description }),
     style: draft.style,
     ...(palette.length === 0 ? {} : { palette }),
+    ...(makeup === undefined ? {} : { makeup }),
     wearables: draft.wearables
       .slice(0, MAX_DRAFT_WEARABLES)
       .map((wearable, index) => toWearableSpec(wearable, `${lookId}-w${index + 1}`)),

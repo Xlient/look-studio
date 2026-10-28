@@ -7,12 +7,31 @@ export type HexColor = z.infer<typeof HexColor>;
 export const LookStyle = z.enum(["casual", "formal", "street", "avant-garde", "sport"]);
 export type LookStyle = z.infer<typeof LookStyle>;
 
+const Opacity = z.number().min(0).max(1);
+
+export const LipFinish = z.enum(["matte", "satin", "gloss"]);
+export type LipFinish = z.infer<typeof LipFinish>;
+
+export const ShadowFinish = z.enum(["matte", "shimmer"]);
+export type ShadowFinish = z.infer<typeof ShadowFinish>;
+
+const TintLayer = z.object({ color: HexColor, opacity: Opacity });
+
+export const Makeup = z.object({
+  lips: TintLayer.extend({ finish: LipFinish }).optional(),
+  blush: TintLayer.optional(),
+  eyeshadow: TintLayer.extend({ finish: ShadowFinish }).optional(),
+  brows: TintLayer.optional(),
+});
+export type Makeup = z.infer<typeof Makeup>;
+
 export const LookSpec = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().max(500).optional(),
   wearables: z.array(WearableSpec).max(20),
   palette: z.array(HexColor).max(8).optional(),
+  makeup: Makeup.optional(),
   style: LookStyle,
   createdAt: z.string().datetime().optional(),
 });

@@ -97,7 +97,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">

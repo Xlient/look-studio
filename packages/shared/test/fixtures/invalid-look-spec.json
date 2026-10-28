@@ -1,5 +1,6 @@
 {
   "id": "look-bad",
   "wearables": [],
-  "style": "victorian"
+  "style": "victorian",
+  "makeup": { "lips": { "color": "red", "opacity": 1.5, "finish": "glitter" } }
 }
