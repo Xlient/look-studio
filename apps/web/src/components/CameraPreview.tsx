@@ -11,10 +11,13 @@ import {
 import type { CameraStatus, VideoDevice } from "../tracking/camera.ts";
 import { useFaceTracker } from "../tracking/use-face-tracker.ts";
 import type { TrackerReadout } from "../tracking/use-face-tracker.ts";
+import { useLookScene } from "../scene/use-look-scene.ts";
 import Window from "./Window.tsx";
 
 export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [mirror, setMirror] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -93,7 +96,8 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
 
   const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
   const showing = status === "live" || status === "sample";
-  const { readout } = useFaceTracker(videoRef, showing);
+  const { headRef, readout } = useFaceTracker(videoRef, showing);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -101,12 +105,14 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
         <div className="player__screen">
           <video
             ref={videoRef}
+            className="player__video--hidden"
             src={sampleUrl ?? undefined}
             muted
             playsInline
-            controls={status === "sample"}
-            aria-label="Camera preview"
+            loop
+            aria-label="Camera source"
           />
+          <canvas ref={canvasRef} className="player__output" hidden={!showing} aria-label="Look Studio output preview" />
           {!showing && (
             <div className="player__idle">
               <span className="player__idle-logo" aria-hidden="true">◉</span>
@@ -142,6 +148,9 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
               {status === "requesting" ? "Requesting…" : "▶ Start camera"}
             </button>
           )}
+          <button type="button" className="btn" aria-pressed={mirror} onClick={() => setMirror((value) => !value)}>
+            ⇋ Mirror
+          </button>
           <label className="btn btn--file">
             Sample video
             <input
