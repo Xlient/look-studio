@@ -18,6 +18,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
+  const [plain, setPlain] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -97,7 +98,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -119,7 +120,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
               <span>NO SIGNAL</span>
             </div>
           )}
-          {look !== null && showing && (
+          {look !== null && showing && !plain && (
             <div className="player__ticker" aria-hidden="true">
               <span>
                 NOW WEARING: {look.name}
@@ -150,6 +151,9 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
           )}
           <button type="button" className="btn" aria-pressed={mirror} onClick={() => setMirror((value) => !value)}>
             ⇋ Mirror
+          </button>
+          <button type="button" className="btn" aria-pressed={plain} onClick={() => setPlain((value) => !value)}>
+            ◌ Plain camera
           </button>
           <label className="btn btn--file">
             Sample video

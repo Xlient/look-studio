@@ -39,7 +39,11 @@ export interface LookRequest {
 }
 
 export interface LookService {
-  createLook(request: LookRequest, signal: AbortSignal): Promise<ServiceResult<LookSpec>>;
+  createLook(
+    request: LookRequest,
+    signal: AbortSignal,
+    onDescription?: (text: string) => void,
+  ): Promise<ServiceResult<LookSpec>>;
 }
 
 export interface EditRequest {

@@ -577,6 +577,119 @@ body {
   color: #8a1b00;
 }
 
+.buddy > .buddy__actions {
+  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.im-line__note {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.im-caret {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.chip[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--tangerine);
+  border-color: #8a3000;
+}
+
+.vibe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.vibe__dial {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.vibe__dial label {
+  font-weight: bold;
+}
+
+.vibe__dial span {
+  color: var(--muted);
+}
+
+.vibe__dial input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--tangerine);
+}
+
+.vibe__value {
+  min-width: 5.5em;
+  font-weight: bold;
+}
+
+.consent {
+  margin-top: 6px;
+  padding: 8px;
+  font-size: 12px;
+  background: #fff8e1;
+  border: 2px solid var(--tangerine);
+}
+
+.consent p {
+  margin: 4px 0 8px;
+}
+
+.consent__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+.job {
+  display: flex;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.job__phase {
+  font-weight: bold;
+}
+
+.job--fitting .job__phase {
+  color: var(--blueberry);
+}
+
+.job--passed .job__phase {
+  color: #1d6b1d;
+}
+
+.job--failed .job__phase,
+.job__error {
+  color: #8a1b00;
+}
+
 /* Model monitor */
 .monitor {
   display: flex;
@@ -765,7 +878,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .player__ticker span,
   .player__idle-logo,
-  .splash__new {
+  .splash__new,
+  .im-caret {
     animation: none;
   }
 

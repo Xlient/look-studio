@@ -1,6 +1,8 @@
 import type { EditCommand, LookSpec } from "@look-studio/shared";
 import type { CallMeta } from "./api-client.ts";
 import { applyEdit, describeEdit } from "./look-edits.ts";
+import { EMPTY_HISTORY, recordLook, redoLook, undoLook } from "./look-history.ts";
+import type { HistoryStep, LookHistory } from "./look-history.ts";
 
 export const MAX_MONITOR_ENTRIES = 50;
 export const OFFLINE_MODEL = "offline-fake";
@@ -15,6 +17,7 @@ export interface ChatMessage {
   text: string;
   look?: LookSpec;
   attachment?: string;
+  note?: string;
 }
 
 export interface MonitorEntry {
@@ -33,16 +36,21 @@ export interface StudioState {
   messages: ChatMessage[];
   monitor: MonitorEntry[];
   look: LookSpec | null;
+  history: LookHistory;
   pending: boolean;
+  streaming: string;
   nextId: number;
 }
 
 export type StudioAction =
-  | { type: "sent"; at: string; text: string; attachment?: string }
+  | { type: "sent"; at: string; text: string; attachment?: string; note?: string }
+  | { type: "streamed"; text: string }
   | { type: "look-received"; at: string; look: LookSpec; meta: CallMeta }
   | { type: "edit-received"; at: string; command: EditCommand; meta: CallMeta }
   | { type: "failed"; at: string; call: CallKind; error: string; message: string }
-  | { type: "reset"; at: string };
+  | { type: "reset"; at: string }
+  | { type: "undo"; at: string }
+  | { type: "redo"; at: string };
 
 export const GREETING =
   "hey!! i'm LookArtist :) tell me the vibe you want, or attach a photo and i'll match its colours and style.";
@@ -52,7 +60,9 @@ export function initialStudioState(at: string): StudioState {
     messages: [{ id: 1, from: "artist", at, text: GREETING }],
     monitor: [],
     look: null,
+    history: EMPTY_HISTORY,
     pending: false,
+    streaming: "",
     nextId: 2,
   };
 }
@@ -74,6 +84,28 @@ function pushMonitor(monitor: MonitorEntry[], entry: MonitorEntry): MonitorEntry
   return [entry, ...monitor].slice(0, MAX_MONITOR_ENTRIES);
 }
 
+function stepTo(state: StudioState, step: HistoryStep | null, at: string, verb: string): StudioState {
+  if (step === null || state.pending) {
+    return state;
+  }
+  const text = step.look === null ? `${verb}: back to the plain camera.` : `${verb}: back to ${step.look.name}.`;
+  return {
+    ...state,
+    look: step.look,
+    history: step.history,
+    nextId: state.nextId + 1,
+    messages: [...state.messages, { id: state.nextId, from: "system", at, text }],
+  };
+}
+
+export function canUndo(state: StudioState): boolean {
+  return !state.pending && state.history.past.length > 0;
+}
+
+export function canRedo(state: StudioState): boolean {
+  return !state.pending && state.history.future.length > 0;
+}
+
 export function nextCall(state: StudioState, hasPhoto: boolean): CallKind {
   return state.look === null || hasPhoto ? "look" : "edit";
 }
@@ -85,17 +117,29 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         pending: true,
+        streaming: "",
         nextId: id + 1,
         messages: [
           ...state.messages,
-          { id, from: "you", at: action.at, text: action.text, ...(action.attachment ? { attachment: action.attachment } : {}) },
+          {
+            id,
+            from: "you",
+            at: action.at,
+            text: action.text,
+            ...(action.attachment ? { attachment: action.attachment } : {}),
+            ...(action.note ? { note: action.note } : {}),
+          },
         ],
       };
+    case "streamed":
+      return state.pending ? { ...state, streaming: state.streaming + action.text } : state;
     case "look-received":
       return {
         ...state,
         pending: false,
+        streaming: "",
         look: action.look,
+        history: recordLook(state.history, state.look),
         nextId: id + 2,
         messages: [
           ...state.messages,
@@ -112,6 +156,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
         ...state,
         pending: false,
         look,
+        history: recordLook(state.history, state.look),
         nextId: id + 2,
         messages: [
           ...state.messages,
@@ -121,16 +166,25 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       };
     }
     case "reset":
+      if (state.look === null) {
+        return state;
+      }
       return {
         ...state,
         look: null,
+        history: recordLook(state.history, state.look),
         nextId: id + 1,
         messages: [...state.messages, { id, from: "system", at: action.at, text: "Starting a fresh look." }],
       };
+    case "undo":
+      return stepTo(state, undoLook(state.history, state.look), action.at, "Undo");
+    case "redo":
+      return stepTo(state, redoLook(state.history, state.look), action.at, "Redo");
     case "failed":
       return {
         ...state,
         pending: false,
+        streaming: "",
         nextId: id + 2,
         messages: [...state.messages, { id, from: "system", at: action.at, text: action.message }],
         monitor: pushMonitor(state.monitor, {

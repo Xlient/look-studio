@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { LookSpec } from "@look-studio/shared";
 import type { BudgetTracker } from "@look-studio/shared";
-import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
-import type { LookService } from "../lib/services.ts";
+import { invalidRequest, modelErrorBody, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
+import type { LookRequest, LookService } from "../lib/services.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
 
 const LookRequestBody = z.object({
@@ -12,7 +13,7 @@ const LookRequestBody = z.object({
   image: z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional(),
 });
 
-async function handleLook(c: Context, service: LookService): Promise<Response> {
+async function parseLookRequest(c: Context): Promise<LookRequest | Response> {
   const body = await readJsonBody(c);
   if (!body.ok) {
     return body.error === "body_too_large"
@@ -23,11 +24,16 @@ async function handleLook(c: Context, service: LookService): Promise<Response> {
   if (!parsed.success) {
     return invalidRequest(c, parsed.error);
   }
+  return { chat: parsed.data.chat, image: parsed.data.image };
+}
+
+async function handleLook(c: Context, service: LookService): Promise<Response> {
+  const request = await parseLookRequest(c);
+  if (request instanceof Response) {
+    return request;
+  }
   try {
-    const result = await service.createLook(
-      { chat: parsed.data.chat, image: parsed.data.image },
-      c.req.raw.signal,
-    );
+    const result = await service.createLook(request, c.req.raw.signal);
     const checked = LookSpec.safeParse(result.data);
     if (!checked.success) {
       return serviceError(c);
@@ -38,9 +44,37 @@ async function handleLook(c: Context, service: LookService): Promise<Response> {
   }
 }
 
+async function handleLookStream(c: Context, service: LookService): Promise<Response> {
+  const request = await parseLookRequest(c);
+  if (request instanceof Response) {
+    return request;
+  }
+  return streamSSE(c, async (stream) => {
+    let writes = Promise.resolve();
+    const onDescription = (text: string) => {
+      writes = writes.then(() => stream.writeSSE({ event: "delta", data: JSON.stringify({ text }) }));
+    };
+    try {
+      const result = await service.createLook(request, c.req.raw.signal, onDescription);
+      await writes;
+      const checked = LookSpec.safeParse(result.data);
+      await stream.writeSSE(
+        checked.success
+          ? { event: "look", data: JSON.stringify({ look: checked.data, meta: result.meta }) }
+          : { event: "error", data: JSON.stringify({ error: "service_error", retryAfterS: null }) },
+      );
+    } catch (error) {
+      await writes;
+      const body = modelErrorBody(error);
+      await stream.writeSSE({ event: "error", data: JSON.stringify({ error: body.error, retryAfterS: body.retryAfterS }) });
+    }
+  });
+}
+
 export function createLookRoutes(service: LookService, budget: BudgetTracker): Hono {
   const app = new Hono();
   app.use(createSpendCapMiddleware(budget));
   app.post("/api/look", (c) => handleLook(c, service));
+  app.post("/api/look/stream", (c) => handleLookStream(c, service));
   return app;
 }

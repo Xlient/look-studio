@@ -3,8 +3,10 @@ import BuddyChat from "./components/BuddyChat.tsx";
 import CameraPreview from "./components/CameraPreview.tsx";
 import ModelMonitor from "./components/ModelMonitor.tsx";
 import Splash from "./components/Splash.tsx";
-import { summarizeMonitor } from "./studio/studio-state.ts";
+import { canRedo, canUndo, summarizeMonitor } from "./studio/studio-state.ts";
+import { historyShortcut } from "./studio/shortcuts.ts";
 import { useStudio } from "./studio/use-studio.ts";
+import { useWearableJobs } from "./studio/use-wearable-jobs.ts";
 
 function Taskbar() {
   const [now, setNow] = useState(() => new Date());
@@ -24,8 +26,26 @@ function Taskbar() {
 }
 
 function Studio() {
-  const { state, send, reset } = useStudio();
+  const { state, send, reset, undo, redo } = useStudio();
+  const jobs = useWearableJobs(state.look);
   const summary = summarizeMonitor(state.monitor);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const shortcut = historyShortcut(event);
+      if (shortcut !== null) {
+        event.preventDefault();
+        if (shortcut === "undo") {
+          undo();
+        } else {
+          redo();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
+
   const succeeded = state.monitor.some((entry) => entry.ok);
   return (
     <div className="desktop">
@@ -35,10 +55,16 @@ function Studio() {
         <BuddyChat
           messages={state.messages}
           pending={state.pending}
+          streaming={state.streaming}
           hasLook={state.look !== null}
+          canUndo={canUndo(state)}
+          canRedo={canRedo(state)}
           online={succeeded ? summary.live : null}
+          jobs={jobs}
           onSend={send}
           onReset={reset}
+          onUndo={undo}
+          onRedo={redo}
         />
         <ModelMonitor entries={state.monitor} />
       </main>

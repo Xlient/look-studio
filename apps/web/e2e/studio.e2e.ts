@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 const LOOK = {
   id: "look-e2e",
@@ -18,10 +18,48 @@ const META = {
   attempts: 1,
 };
 
-async function enterStudio(page: Page) {
-  await page.route("**/api/look", (route) => route.fulfill({ json: { ok: true, look: LOOK, meta: META } }));
+function sse(events: [string | null, unknown][]): string {
+  return events.map(([event, data]) => `${event === null ? "" : `event: ${event}\n`}data: ${JSON.stringify(data)}\n\n`).join("");
+}
+
+async function mockApi(page: Page): Promise<string[]> {
+  const prompts: string[] = [];
+  await page.route("**/api/look/stream", (route) => {
+    const body: unknown = route.request().postDataJSON();
+    prompts.push(typeof body === "object" && body !== null && "chat" in body ? String(body.chat) : "");
+    return route.fulfill({
+      contentType: "text/event-stream",
+      body: sse([["delta", { text: "Coral and " }], ["delta", { text: "hearts." }], ["look", { look: LOOK, meta: META }]]),
+    });
+  });
+  await page.route("**/api/wearable", (route) => route.fulfill({ json: { ok: true, jobId: "job-e2e" } }));
+  await page.route("**/api/wearable/*/events", (route) =>
+    route.fulfill({
+      contentType: "text/event-stream",
+      body: sse([
+        [null, { jobId: "job-e2e", state: "running", progress: { completed: 1, total: 2 } }],
+        [null, { jobId: "job-e2e", state: "succeeded" }],
+      ]),
+    }),
+  );
+  return prompts;
+}
+
+async function enterStudio(page: Page): Promise<string[]> {
+  const prompts = await mockApi(page);
   await page.goto("/");
   await page.getByRole("button", { name: /Enter the Studio/ }).click();
+  return prompts;
+}
+
+async function tabTo(page: Page, target: Locator, limit = 80) {
+  for (let i = 0; i < limit; i += 1) {
+    if (await target.evaluate((node) => node === document.activeElement)) {
+      return;
+    }
+    await page.keyboard.press("Tab");
+  }
+  throw new Error("element not reachable with Tab");
 }
 
 async function canvasHasPixels(page: Page): Promise<boolean> {
@@ -103,4 +141,63 @@ test("sample video mode works without a camera", async ({ page }) => {
   });
   await expect(page.locator(".player__idle")).toHaveCount(0);
   await expect.poll(() => canvasHasPixels(page), { timeout: 15_000 }).toBe(true);
+});
+
+test("the whole chat flow works with the keyboard only", async ({ page }) => {
+  const prompts = await mockApi(page);
+  await page.goto("/");
+  await tabTo(page, page.getByRole("button", { name: /Enter the Studio/ }));
+  await page.keyboard.press("Enter");
+
+  const party = page.getByRole("button", { name: "Party" });
+  await tabTo(page, party);
+  await page.keyboard.press("Space");
+  await expect(party).toHaveAttribute("aria-pressed", "true");
+
+  await tabTo(page, page.getByLabel("Vibe"));
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".vibe__value")).toHaveText("bold");
+
+  await tabTo(page, page.getByLabel("Message LookArtist"));
+  await page.keyboard.type("Coral glow");
+  await page.keyboard.press("Enter");
+  const log = page.getByRole("log", { name: "Conversation" });
+  await expect(log).toContainText(LOOK.name);
+  await expect(log).toContainText("[party · bold]");
+  expect(prompts[0]).toContain("Occasion: party.");
+  expect(prompts[0]).toContain("Vibe: 80/100 (bold)");
+  await expect(page.getByRole("list", { name: "Wearable jobs" })).toContainText("Crownpassed");
+
+  await tabTo(page, page.getByRole("button", { name: /Undo/ }));
+  await page.keyboard.press("Enter");
+  await expect(log).toContainText("Undo: back to the plain camera.");
+  await page.keyboard.press("Control+Shift+Z");
+  await expect(log).toContainText(`Redo: back to ${LOOK.name}.`);
+
+  const plain = page.getByRole("button", { name: /Plain camera/ });
+  await tabTo(page, plain);
+  await page.keyboard.press("Space");
+  await expect(plain).toHaveAttribute("aria-pressed", "true");
+
+  const attach = page.getByRole("button", { name: "Attach photo" });
+  await tabTo(page, attach);
+  await page.keyboard.press("Enter");
+  const consent = page.getByRole("alertdialog", { name: "Before you attach a photo" });
+  await expect(consent).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(consent).toHaveCount(0);
+  await expect(attach).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: /I agree/ })).toBeFocused();
+  const chooser = page.waitForEvent("filechooser");
+  await page.keyboard.press("Enter");
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await (await chooser).setFiles({ name: "ref.png", mimeType: "image/png", buffer: png });
+  await expect(page.getByText("Attached ref.png.")).toBeVisible();
 });
