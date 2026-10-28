@@ -183,7 +183,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         look: action.look,
-        history: recordLook(state.history, state.look),
+        history: commitReplace(state.history, state.look, action.look),
         nextId: id + 1,
         messages: [...state.messages, { id, from: "system", at: action.at, text: `Wearing favorite: ${action.name}.` }],
       };
