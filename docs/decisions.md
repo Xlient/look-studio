@@ -83,3 +83,4 @@ Why each dependency and convention was chosen. All versions are pinned exact
 - P4: added web camera device picker, permission states, sample-video fallback, tested camera helpers; agent-written.
 - Phase A: real Muse Spark look/edit services (look-draft.ts, edit-draft.ts, muse-services.ts, services.ts, http.ts, routes/look.ts, routes/edit.ts, container.ts, index.ts; tests drafts.test.ts, muse-services.test.ts); agent-written.
 - Phase B: Y2K desktop UI (App.tsx, components/Window, BuddyChat, ModelMonitor, Splash, CameraPreview restyle, styles.css; studio/api-client, studio-state, look-edits, photo, use-studio; removed PlaceholderPanel; tests studio.test.ts, smoke.test.ts; .claude/launch.json); agent-written.
+- M5: face tracking (tracking/head-state.ts, face-tracker.ts, landmarker.ts, use-face-tracker.ts; CameraPreview.tsx LCD readout; styles.css; test tracking.test.ts); model fetched from Google storage per user OK; agent-written.
