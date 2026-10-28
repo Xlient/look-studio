@@ -47,7 +47,7 @@ Run these yourself. Replace `PROJECT_ID`, `PROJECT_NUMBER` and `GITHUB_REPO` (`X
    - `GCP_PROJECT_ID`: `PROJECT_ID`
    - `GCP_WIF_PROVIDER`: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github`
    - `GCP_DEPLOY_SA`: `github-deploy@PROJECT_ID.iam.gserviceaccount.com`
-   - optional: `DAILY_SPEND_CAP_USD` (default 5) and `RATE_LIMIT_MAX` (default 60 per minute per IP)
+   - optional: `DAILY_SPEND_CAP_USD` (default 5), `RATE_LIMIT_MAX` (default 60 per minute per IP), and `LOOK_REASONING_EFFORT` (`minimal`, `low`, `medium` or `high`; default `low`; lower means faster looks)
 8. Merge into `main`. The first push deploys Cloud Run and then Hosting, and the live URL is `https://PROJECT_ID.web.app`. PR previews only work once that first deploy exists, because Hosting checks that the Cloud Run service exists.
 
 Until `GCP_PROJECT_ID` is set, the preview and deploy jobs are skipped. Only the image build and boot check run.

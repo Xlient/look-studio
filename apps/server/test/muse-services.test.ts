@@ -105,6 +105,23 @@ describe("MuseLookService", () => {
     expect(spent).toHaveLength(1);
   });
 
+  it("asks for low reasoning effort unless LOOK_REASONING_EFFORT overrides it", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
+    await new MuseLookService(deps).createLook({ chat: "gold" }, signal);
+    process.env.LOOK_REASONING_EFFORT = "minimal";
+    await new MuseLookService(deps).createLook({ chat: "gold" }, signal);
+    expect(bodies.map((body) => body["reasoning"])).toEqual([{ effort: "low" }, { effort: "minimal" }]);
+  });
+
+  it("rejects an unknown LOOK_REASONING_EFFORT before calling the model", async () => {
+    process.env.LOOK_REASONING_EFFORT = "turbo";
+    const bodies: Record<string, unknown>[] = [];
+    const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
+    await expect(new MuseLookService(deps).createLook({ chat: "gold" }, signal)).rejects.toThrow("LOOK_REASONING_EFFORT");
+    expect(bodies).toHaveLength(0);
+  });
+
   it("sends a reference photo as an image input", async () => {
     const bodies: Record<string, unknown>[] = [];
     const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));

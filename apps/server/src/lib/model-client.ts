@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { z } from "zod";
 import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { RetryPolicy } from "@look-studio/shared";
 import { envNumber, requiredEnv } from "../env.ts";
@@ -7,6 +8,9 @@ import { ModelError, toModelError } from "./model-errors.ts";
 import { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy } from "./retry-policy.ts";
 
 export const MODEL_API_BASE_URL = "https://api.meta.ai/v1";
+
+export const ReasoningEffort = z.enum(["minimal", "low", "medium", "high"]);
+export type ReasoningEffort = z.infer<typeof ReasoningEffort>;
 
 export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -50,6 +54,7 @@ export interface StructuredCallOptions {
   timeoutMs?: number;
   fetch?: FetchFn;
   onTextDelta?: (delta: string) => void;
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface TokenUsage {
@@ -101,7 +106,12 @@ function buildInput(prompt: string, imageUrls: string[]): string | UserMessage[]
 interface ModelResponse {
   id?: unknown;
   output_text?: unknown;
-  usage?: { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown } | null;
+  usage?: {
+    input_tokens?: unknown;
+    output_tokens?: unknown;
+    total_tokens?: unknown;
+    output_tokens_details?: { reasoning_tokens?: unknown } | null;
+  } | null;
 }
 
 async function streamResponse(
@@ -137,6 +147,7 @@ async function executeStructured<T>(args: {
   retryPolicy: RetryPolicy;
   timeoutMs: number;
   onTextDelta?: (delta: string) => void;
+  reasoningEffort?: ReasoningEffort;
   parseOutput: (outputText: string) => T;
 }): Promise<StructuredCallResult<T>> {
   const startedAt = Date.now();
@@ -151,9 +162,10 @@ async function executeStructured<T>(args: {
           text: {
             format: { type: "json_schema", name: args.schemaName, schema: args.schema, strict: true },
           },
+          ...(args.reasoningEffort === undefined ? {} : { reasoning: { effort: args.reasoningEffort } }),
         };
         const requestOptions = { timeout: args.timeoutMs, signal: args.signal };
-        const response =
+        const response: ModelResponse =
           args.onTextDelta === undefined
             ? await args.client.responses.create(body, requestOptions)
             : await streamResponse(args.client, body, requestOptions, args.onTextDelta, args.model);
@@ -169,6 +181,7 @@ async function executeStructured<T>(args: {
             total: toTokenCount(response.usage?.total_tokens),
           },
           requestId: typeof response.id === "string" ? response.id : null,
+          reasoningTokens: toTokenCount(response.usage?.output_tokens_details?.reasoning_tokens),
         };
       } catch (error) {
         throw toModelError(error, args.model, args.signal);
@@ -185,10 +198,12 @@ async function executeStructured<T>(args: {
       inputTokens: completed.tokens.input,
       outputTokens: completed.tokens.output,
       totalTokens: completed.tokens.total,
+      reasoningTokens: completed.reasoningTokens,
+      reasoningEffort: args.reasoningEffort ?? null,
       requestId: completed.requestId,
       attempts,
     });
-    return { ...completed, latencyMs, model: args.model, attempts };
+    return { data: completed.data, tokens: completed.tokens, requestId: completed.requestId, latencyMs, model: args.model, attempts };
   } catch (error) {
     const typed = toModelError(error, args.model, args.signal);
     logInfo({
@@ -218,6 +233,7 @@ export async function callModelStructured<T>(
     retryPolicy: options.retryPolicy,
     timeoutMs: options.timeoutMs ?? modelTimeoutMs(),
     onTextDelta: options.onTextDelta,
+    reasoningEffort: options.reasoningEffort,
     parseOutput: (outputText) => JSON.parse(outputText) as T,
   });
 }
@@ -273,6 +289,7 @@ export async function callModelWithImage<T>(options: ImageCallOptions): Promise<
     retryPolicy: options.retryPolicy,
     timeoutMs: options.timeoutMs ?? modelTimeoutMs(),
     onTextDelta: options.onTextDelta,
+    reasoningEffort: options.reasoningEffort,
     parseOutput: (outputText) => JSON.parse(outputText) as T,
   });
 }
