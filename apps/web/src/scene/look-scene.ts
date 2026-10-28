@@ -1,54 +1,46 @@
 import {
   AmbientLight,
   CanvasTexture,
-  ConeGeometry,
-  CylinderGeometry,
   DirectionalLight,
-  DoubleSide,
   Group,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   Object3D,
   OrthographicCamera,
   PlaneGeometry,
   Scene,
-  SphereGeometry,
   SRGBColorSpace,
   WebGLRenderer,
 } from "three";
 import type { HeadAnchor } from "./head-anchor.ts";
-
-const CROWN_POINTS = 5;
-const CROWN_RADIUS = 0.75;
-const CROWN_TILT = 0.2;
+import { EMPTY_LAYOUT } from "./wearable-layout.ts";
+import type { WearableLayout, WearableSlot } from "./wearable-layout.ts";
+import { buildCrown, buildGlasses, buildHat } from "./wearable-templates.ts";
+import type { WearableTemplate } from "./wearable-templates.ts";
 
 export interface LookScene {
   resize(width: number, height: number): void;
   setMirror(mirror: boolean): void;
+  setWearables(layout: WearableLayout): void;
   render(anchor: HeadAnchor): void;
   dispose(): void;
 }
 
-function buildCrown(): Group {
-  const gold = new MeshStandardMaterial({ color: 0xf5c542, metalness: 0.85, roughness: 0.25, side: DoubleSide });
-  const gem = new MeshStandardMaterial({ color: 0xff3fa4, emissive: 0x5a0030, metalness: 0.2, roughness: 0.1 });
-  const crown = new Group();
-  crown.rotation.x = CROWN_TILT;
-  const band = new Mesh(new CylinderGeometry(CROWN_RADIUS, CROWN_RADIUS * 0.95, 0.32, 32, 1, true), gold);
-  crown.add(band);
-  for (let i = 0; i < CROWN_POINTS; i += 1) {
-    const angle = (i / CROWN_POINTS) * Math.PI * 2;
-    const x = Math.sin(angle) * CROWN_RADIUS;
-    const z = Math.cos(angle) * CROWN_RADIUS;
-    const spike = new Mesh(new ConeGeometry(0.17, 0.42, 4), gold);
-    spike.position.set(x, 0.37, z);
-    const jewel = new Mesh(new SphereGeometry(0.07, 12, 8), gem);
-    jewel.position.set(x, 0.6, z);
-    crown.add(spike, jewel);
+function wrap(template: WearableTemplate): Group {
+  const holder = new Group();
+  holder.add(template.group);
+  holder.visible = false;
+  return holder;
+}
+
+function place(holder: Group, template: WearableTemplate, slot: WearableSlot | null) {
+  holder.visible = slot !== null;
+  if (slot !== null) {
+    template.tint.color.setHex(slot.color);
+    holder.position.set(slot.offset.x, slot.offset.y, slot.offset.z);
+    holder.scale.set(slot.scale, slot.scale, slot.scale);
   }
-  return crown;
 }
 
 export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLCanvasElement): LookScene {
@@ -66,11 +58,27 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
   backdrop.position.set(0, 0, -4_000);
   backdrop.renderOrder = -1;
 
-  const crown = new Group();
-  crown.add(buildCrown());
+  const crown = buildCrown();
+  const hat = buildHat();
+  const glasses = buildGlasses();
+  const crownHolder = wrap(crown);
+  const hatHolder = wrap(hat);
+  const glassesHolder = wrap(glasses);
+  const headPivot = new Group();
+  headPivot.add(crownHolder, hatHolder);
+  const eyesPivot = new Group();
+  eyesPivot.add(glassesHolder);
   const directional = new DirectionalLight(0xffffff, 2.2);
   directional.position.set(0.3, 1, 1);
-  scene.add(backdrop, crown, new AmbientLight(0xffffff, 0.9), directional);
+  scene.add(backdrop, headPivot, eyesPivot, new AmbientLight(0xffffff, 0.9), directional);
+
+  const setWearables = (layout: WearableLayout) => {
+    const head = layout.head;
+    place(crownHolder, crown, head?.template === "crown" ? head : null);
+    place(hatHolder, hat, head?.template === "hat" ? head : null);
+    place(glassesHolder, glasses, layout.eyes);
+  };
+  setWearables(EMPTY_LAYOUT);
 
   const pose = new Matrix4();
   const rotation = new Matrix4();
@@ -94,14 +102,19 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
       mirror = next;
       backdrop.scale.set(mirror ? -width : width, backdrop.scale.y, 1);
     },
+    setWearables,
     render(anchor) {
       texture.needsUpdate = true;
-      crown.visible = anchor.visible;
+      headPivot.visible = anchor.visible;
+      eyesPivot.visible = anchor.visible;
       if (anchor.visible) {
         rotation.extractRotation(pose.fromArray(anchor.rotation));
-        crown.quaternion.setFromRotationMatrix(rotation);
-        crown.position.set(anchor.x, anchor.y, 0);
-        crown.scale.set(anchor.scale, anchor.scale, anchor.scale);
+        headPivot.quaternion.setFromRotationMatrix(rotation);
+        eyesPivot.quaternion.setFromRotationMatrix(rotation);
+        headPivot.position.set(anchor.x, anchor.y, 0);
+        eyesPivot.position.set(anchor.eyesX, anchor.eyesY, 0);
+        headPivot.scale.set(anchor.scale, anchor.scale, anchor.scale);
+        eyesPivot.scale.set(anchor.scale, anchor.scale, anchor.scale);
       }
       renderer.render(scene, camera);
     },

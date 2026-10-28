@@ -54,6 +54,16 @@ declare module "three" {
   export class SphereGeometry extends BufferGeometry {
     constructor(radius?: number, widthSegments?: number, heightSegments?: number);
   }
+  export class TorusGeometry extends BufferGeometry {
+    constructor(radius?: number, tube?: number, radialSegments?: number, tubularSegments?: number);
+  }
+  export class BoxGeometry extends BufferGeometry {
+    constructor(width?: number, height?: number, depth?: number);
+  }
+
+  export class Color {
+    setHex(hex: number): this;
+  }
 
   export class Texture {
     colorSpace: string;
@@ -82,6 +92,7 @@ declare module "three" {
   }
   export class MeshStandardMaterial extends Material {
     constructor(parameters?: MaterialParameters);
+    readonly color: Color;
   }
 
   export class Mesh extends Object3D {

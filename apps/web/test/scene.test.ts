@@ -112,3 +112,17 @@ describe("createFrameGate", () => {
     expect(passed).toBe(30);
   });
 });
+
+describe("eye anchor", () => {
+  it("sits between the eye corners and mirrors with the view", () => {
+    const state = head();
+    setPoint(state, RIGHT_EYE_OUTER, 0.55, 0.45);
+    setPoint(state, LEFT_EYE_OUTER, 0.65, 0.47);
+    const plain = writeHeadAnchor(createHeadAnchor(), state, VIEW);
+    expect(plain.eyesX).toBeCloseTo(100);
+    expect(plain.eyesY).toBeCloseTo(40);
+    const mirrored = writeHeadAnchor(createHeadAnchor(), state, { ...VIEW, mirror: true });
+    expect(mirrored.eyesX).toBeCloseTo(-100);
+    expect(mirrored.eyesY).toBeCloseTo(40);
+  });
+});
