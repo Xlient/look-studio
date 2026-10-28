@@ -1,6 +1,11 @@
 import { EditCommand, LookSpec } from "@look-studio/shared";
+import type { WearableSpec } from "@look-studio/shared";
+import { readSse } from "./sse.ts";
+import { parseJobStatus } from "./wearable-jobs.ts";
+import type { JobStatus } from "./wearable-jobs.ts";
 
 export const REQUEST_TIMEOUT_MS = 45_000;
+export const JOB_WATCH_TIMEOUT_MS = 300_000;
 
 export interface CallMeta {
   model: string;
@@ -10,9 +15,13 @@ export interface CallMeta {
   attempts: number;
 }
 
-export type ApiResult<T> =
-  | { ok: true; data: T; meta: CallMeta }
-  | { ok: false; error: string; retryAfterS: number | null };
+export interface ApiFailure {
+  ok: false;
+  error: string;
+  retryAfterS: number | null;
+}
+
+export type ApiResult<T> = { ok: true; data: T; meta: CallMeta } | ApiFailure;
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -55,25 +64,44 @@ function retryAfterSeconds(response: Response): number | null {
   return response.headers.has("retry-after") && Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
-async function postJson<T>(
+function resolveFetch(options: RequestOptions): FetchLike {
+  return options.fetchFn ?? ((input: string, init: RequestInit) => fetch(input, init));
+}
+
+function transportFailure(timeout: AbortSignal, signal: AbortSignal): ApiFailure {
+  return { ok: false, error: timeout.aborted ? "timeout" : signal.aborted ? "aborted" : "network", retryAfterS: null };
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+async function failureFrom(response: Response): Promise<ApiFailure> {
+  const payload = parseJson(await response.text().catch(() => ""));
+  const error = isRecord(payload) && typeof payload["error"] === "string" ? payload["error"] : "bad_response";
+  return { ok: false, error, retryAfterS: retryAfterSeconds(response) };
+}
+
+async function postForPayload(
   path: string,
   body: unknown,
-  field: string,
-  parse: (value: unknown) => T | null,
   options: RequestOptions,
-): Promise<ApiResult<T>> {
-  const fetchFn = options.fetchFn ?? ((input: string, init: RequestInit) => fetch(input, init));
+): Promise<{ ok: true; payload: Record<string, unknown> } | ApiFailure> {
   const timeout = AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
-    response = await fetchFn(path, {
+    response = await resolveFetch(options)(path, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.any([options.signal, timeout]),
     });
   } catch {
-    return { ok: false, error: timeout.aborted ? "timeout" : options.signal.aborted ? "aborted" : "network", retryAfterS: null };
+    return transportFailure(timeout, options.signal);
   }
   let payload: unknown;
   try {
@@ -85,22 +113,114 @@ async function postJson<T>(
     const error = isRecord(payload) && typeof payload["error"] === "string" ? payload["error"] : "bad_response";
     return { ok: false, error, retryAfterS: retryAfterSeconds(response) };
   }
-  const data = parse(payload[field]);
-  const meta = parseMeta(payload["meta"]);
+  return { ok: true, payload };
+}
+
+async function postJson<T>(
+  path: string,
+  body: unknown,
+  field: string,
+  parse: (value: unknown) => T | null,
+  options: RequestOptions,
+): Promise<ApiResult<T>> {
+  const result = await postForPayload(path, body, options);
+  if (!result.ok) {
+    return result;
+  }
+  const data = parse(result.payload[field]);
+  const meta = parseMeta(result.payload["meta"]);
   if (data === null || meta === null) {
     return { ok: false, error: "bad_response", retryAfterS: null };
   }
   return { ok: true, data, meta };
 }
 
-export function requestLook(
+function parseLook(value: unknown): LookSpec | null {
+  const checked = LookSpec.safeParse(value);
+  return checked.success ? checked.data : null;
+}
+
+function streamedResult(event: string, payload: unknown): ApiResult<LookSpec> | null {
+  if (event === "look" && isRecord(payload)) {
+    const look = parseLook(payload["look"]);
+    const meta = parseMeta(payload["meta"]);
+    return look === null || meta === null ? { ok: false, error: "bad_response", retryAfterS: null } : { ok: true, data: look, meta };
+  }
+  if (event === "error") {
+    const error = isRecord(payload) && typeof payload["error"] === "string" ? payload["error"] : "bad_response";
+    const retryAfterS = isRecord(payload) && isCount(payload["retryAfterS"]) ? payload["retryAfterS"] : null;
+    return { ok: false, error, retryAfterS };
+  }
+  return null;
+}
+
+export async function streamLook(
   input: { chat: string; image?: string },
-  options: RequestOptions,
+  options: RequestOptions & { onText: (text: string) => void },
 ): Promise<ApiResult<LookSpec>> {
-  return postJson("/api/look", input, "look", (value) => {
-    const checked = LookSpec.safeParse(value);
-    return checked.success ? checked.data : null;
-  }, options);
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  try {
+    const response = await resolveFetch(options)("/api/look/stream", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify(input),
+      signal: AbortSignal.any([options.signal, timeout]),
+    });
+    const type = response.headers.get("content-type") ?? "";
+    if (!response.ok || !type.includes("text/event-stream") || response.body === null) {
+      return await failureFrom(response);
+    }
+    let result: ApiResult<LookSpec> = { ok: false, error: "bad_response", retryAfterS: null };
+    await readSse(response.body, (event) => {
+      const payload = parseJson(event.data);
+      if (event.event === "delta" && isRecord(payload) && typeof payload["text"] === "string") {
+        options.onText(payload["text"]);
+        return;
+      }
+      result = streamedResult(event.event, payload) ?? result;
+    });
+    return result;
+  } catch {
+    return transportFailure(timeout, options.signal);
+  }
+}
+
+export async function createWearableJob(
+  wearable: WearableSpec,
+  options: RequestOptions,
+): Promise<{ ok: true; jobId: string } | ApiFailure> {
+  const result = await postForPayload("/api/wearable", wearable, options);
+  if (!result.ok) {
+    return result;
+  }
+  const jobId = result.payload["jobId"];
+  return typeof jobId === "string" && jobId !== "" ? { ok: true, jobId } : { ok: false, error: "bad_response", retryAfterS: null };
+}
+
+export async function watchWearableJob(
+  jobId: string,
+  options: RequestOptions & { onStatus: (status: JobStatus) => void },
+): Promise<{ ok: true } | ApiFailure> {
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? JOB_WATCH_TIMEOUT_MS);
+  try {
+    const response = await resolveFetch(options)(`/api/wearable/${encodeURIComponent(jobId)}/events`, {
+      method: "GET",
+      headers: { accept: "text/event-stream" },
+      signal: AbortSignal.any([options.signal, timeout]),
+    });
+    if (!response.ok || response.body === null) {
+      return await failureFrom(response);
+    }
+    await readSse(response.body, (event) => {
+      const status = parseJobStatus(parseJson(event.data));
+      if (status !== null) {
+        options.onStatus(status);
+      }
+    });
+    return { ok: true };
+  } catch {
+    return transportFailure(timeout, options.signal);
+  }
 }
 
 export function requestEdit(

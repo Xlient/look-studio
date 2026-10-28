@@ -12,6 +12,7 @@ import { makeupPasses } from "./makeup-style.ts";
 import type { MakeupPass } from "./makeup-style.ts";
 
 const OUTPUT_FPS = 30;
+const NO_PASSES: MakeupPass[] = [];
 
 interface LookSceneRefs {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -24,10 +25,13 @@ export function useLookScene(
   active: boolean,
   mirror: boolean,
   makeup: Makeup | undefined,
+  plain: boolean,
 ) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
   const passesRef = useRef<MakeupPass[]>([]);
+  const plainRef = useRef(plain);
+  plainRef.current = plain;
 
   useEffect(() => {
     passesRef.current = makeupPasses(makeup);
@@ -69,8 +73,11 @@ export function useLookScene(
         scene.resize(view.width, view.height);
       }
       const head = headRef.current;
-      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passesRef.current, view.width, view.height);
-      scene.render(writeHeadAnchor(anchor, head, view));
+      const passes = plainRef.current ? NO_PASSES : passesRef.current;
+      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passes, view.width, view.height);
+      writeHeadAnchor(anchor, head, view);
+      anchor.visible = anchor.visible && !plainRef.current;
+      scene.render(anchor);
     };
     handle = requestAnimationFrame(frame);
 

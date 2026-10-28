@@ -4,6 +4,7 @@ import { LookDraft, LookDraftJsonSchema, buildLookPrompt, draftToLookSpec } from
 import { callModelStructured, callModelWithImage } from "./model-client.ts";
 import type { FetchFn, StructuredCallResult } from "./model-client.ts";
 import { ModelError } from "./model-errors.ts";
+import { createFieldStreamer } from "./partial-json.ts";
 import { EditUnresolvedError } from "./services.ts";
 import type {
   EditRequest,
@@ -50,7 +51,11 @@ export class MuseLookService implements LookService {
     this.deps = deps;
   }
 
-  async createLook(request: LookRequest, signal: AbortSignal): Promise<ServiceResult<LookSpec>> {
+  async createLook(
+    request: LookRequest,
+    signal: AbortSignal,
+    onDescription?: (text: string) => void,
+  ): Promise<ServiceResult<LookSpec>> {
     acquire(this.deps.rateLimiter, MUSE_SPARK_MODEL);
     const options = {
       model: MUSE_SPARK_MODEL,
@@ -60,6 +65,7 @@ export class MuseLookService implements LookService {
       signal,
       retryPolicy: this.deps.retryPolicy,
       fetch: this.deps.fetch,
+      ...(onDescription === undefined ? {} : { onTextDelta: createFieldStreamer("description", onDescription) }),
     };
     const result =
       request.image === undefined

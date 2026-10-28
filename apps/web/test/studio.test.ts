@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LookSpec } from "@look-studio/shared";
-import { errorMessage, parseMeta, requestEdit, requestLook } from "../src/studio/api-client.ts";
+import { errorMessage, parseMeta, requestEdit, streamLook } from "../src/studio/api-client.ts";
 import type { CallMeta, FetchLike } from "../src/studio/api-client.ts";
 import { applyEdit, describeEdit } from "../src/studio/look-edits.ts";
 import { checkPhoto, MAX_PHOTO_BYTES } from "../src/studio/photo.ts";
@@ -34,14 +34,35 @@ function respond(status: number, payload: unknown, headers: Record<string, strin
   return async () => new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json", ...headers } });
 }
 
+function respondSse(events: [string, unknown][]): FetchLike {
+  const body = events.map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`).join("");
+  return async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+}
+
+const noText = () => undefined;
+
 describe("api client", () => {
-  it("returns a validated look with meta", async () => {
-    const result = await requestLook({ chat: "gold" }, { signal, fetchFn: respond(200, { ok: true, look, meta }) });
+  it("streams description text, then returns a validated look with meta", async () => {
+    const chunks: string[] = [];
+    const fetchFn = respondSse([["delta", { text: "Gold " }], ["delta", { text: "hour." }], ["look", { look, meta }]]);
+    const result = await streamLook({ chat: "gold" }, { signal, fetchFn, onText: (text) => chunks.push(text) });
+    expect(chunks).toEqual(["Gold ", "hour."]);
     expect(result).toEqual({ ok: true, data: look, meta });
   });
 
+  it("passes streamed error events through", async () => {
+    const fetchFn = respondSse([["error", { error: "model_rate_limited", retryAfterS: 4 }]]);
+    expect(await streamLook({ chat: "x" }, { signal, fetchFn, onText: noText })).toEqual({
+      ok: false,
+      error: "model_rate_limited",
+      retryAfterS: 4,
+    });
+    const ended = await streamLook({ chat: "x" }, { signal, fetchFn: respondSse([["delta", { text: "a" }]]), onText: noText });
+    expect(ended).toEqual({ ok: false, error: "bad_response", retryAfterS: null });
+  });
+
   it("rejects responses that fail validation", async () => {
-    const badLook = await requestLook({ chat: "x" }, { signal, fetchFn: respond(200, { ok: true, look: { id: "" }, meta }) });
+    const badLook = await streamLook({ chat: "x" }, { signal, fetchFn: respondSse([["look", { look: { id: "" }, meta }]]), onText: noText });
     expect(badLook).toEqual({ ok: false, error: "bad_response", retryAfterS: null });
     const badMeta = await requestEdit(
       { utterance: "x", look },
@@ -51,9 +72,9 @@ describe("api client", () => {
   });
 
   it("passes server errors and Retry-After through", async () => {
-    const result = await requestLook(
+    const result = await streamLook(
       { chat: "x" },
-      { signal, fetchFn: respond(429, { ok: false, error: "model_rate_limited" }, { "retry-after": "3" }) },
+      { signal, fetchFn: respond(429, { ok: false, error: "model_rate_limited" }, { "retry-after": "3" }), onText: noText },
     );
     expect(result).toEqual({ ok: false, error: "model_rate_limited", retryAfterS: 3 });
     expect(errorMessage("model_rate_limited", 3)).toContain("3s");
@@ -63,10 +84,14 @@ describe("api client", () => {
     const offline: FetchLike = async () => {
       throw new TypeError("failed to fetch");
     };
-    expect((await requestLook({ chat: "x" }, { signal, fetchFn: offline })).ok).toBe(false);
+    expect(await streamLook({ chat: "x" }, { signal, fetchFn: offline, onText: noText })).toEqual({
+      ok: false,
+      error: "network",
+      retryAfterS: null,
+    });
     const hanging: FetchLike = (_input, init) =>
       new Promise((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
-    const timedOut = await requestLook({ chat: "x" }, { signal, fetchFn: hanging, timeoutMs: 5 });
+    const timedOut = await streamLook({ chat: "x" }, { signal, fetchFn: hanging, timeoutMs: 5, onText: noText });
     expect(timedOut).toEqual({ ok: false, error: "timeout", retryAfterS: null });
   });
 

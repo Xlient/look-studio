@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import type { RetryPolicy } from "@look-studio/shared";
 import { envNumber, requiredEnv } from "../env.ts";
 import { logInfo } from "./logger.ts";
@@ -48,6 +49,7 @@ export interface StructuredCallOptions {
   retryPolicy: RetryPolicy;
   timeoutMs?: number;
   fetch?: FetchFn;
+  onTextDelta?: (delta: string) => void;
 }
 
 export interface TokenUsage {
@@ -96,6 +98,34 @@ function buildInput(prompt: string, imageUrls: string[]): string | UserMessage[]
   ];
 }
 
+interface ModelResponse {
+  id?: unknown;
+  output_text?: unknown;
+  usage?: { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown } | null;
+}
+
+async function streamResponse(
+  client: OpenAI,
+  body: ResponseCreateParamsNonStreaming,
+  requestOptions: { timeout: number; signal: AbortSignal },
+  onTextDelta: (delta: string) => void,
+  model: string,
+): Promise<ModelResponse> {
+  const stream = await client.responses.create({ ...body, stream: true }, requestOptions);
+  let text = "";
+  for await (const event of stream) {
+    if (event.type === "response.output_text.delta") {
+      text += event.delta;
+      onTextDelta(event.delta);
+    } else if (event.type === "response.completed") {
+      return { id: event.response.id, usage: event.response.usage, output_text: text };
+    } else if (event.type === "response.failed" || event.type === "response.incomplete" || event.type === "error") {
+      throw new ModelError("invalid_response", { model });
+    }
+  }
+  throw new ModelError("invalid_response", { model });
+}
+
 async function executeStructured<T>(args: {
   client: OpenAI;
   model: string;
@@ -106,6 +136,7 @@ async function executeStructured<T>(args: {
   signal: AbortSignal;
   retryPolicy: RetryPolicy;
   timeoutMs: number;
+  onTextDelta?: (delta: string) => void;
   parseOutput: (outputText: string) => T;
 }): Promise<StructuredCallResult<T>> {
   const startedAt = Date.now();
@@ -114,21 +145,18 @@ async function executeStructured<T>(args: {
     const completed = await args.retryPolicy.run(async () => {
       attempts += 1;
       try {
-        const response = await args.client.responses.create(
-          {
-            model: args.model,
-            input: buildInput(args.prompt, args.imageUrls),
-            text: {
-              format: {
-                type: "json_schema",
-                name: args.schemaName,
-                schema: args.schema,
-                strict: true,
-              },
-            },
+        const body: ResponseCreateParamsNonStreaming = {
+          model: args.model,
+          input: buildInput(args.prompt, args.imageUrls),
+          text: {
+            format: { type: "json_schema", name: args.schemaName, schema: args.schema, strict: true },
           },
-          { timeout: args.timeoutMs, signal: args.signal },
-        );
+        };
+        const requestOptions = { timeout: args.timeoutMs, signal: args.signal };
+        const response =
+          args.onTextDelta === undefined
+            ? await args.client.responses.create(body, requestOptions)
+            : await streamResponse(args.client, body, requestOptions, args.onTextDelta, args.model);
         const outputText = response.output_text;
         if (typeof outputText !== "string") {
           throw new ModelError("invalid_response", { model: args.model });
@@ -189,6 +217,7 @@ export async function callModelStructured<T>(
     signal: options.signal,
     retryPolicy: options.retryPolicy,
     timeoutMs: options.timeoutMs ?? modelTimeoutMs(),
+    onTextDelta: options.onTextDelta,
     parseOutput: (outputText) => JSON.parse(outputText) as T,
   });
 }
@@ -243,6 +272,7 @@ export async function callModelWithImage<T>(options: ImageCallOptions): Promise<
     signal: options.signal,
     retryPolicy: options.retryPolicy,
     timeoutMs: options.timeoutMs ?? modelTimeoutMs(),
+    onTextDelta: options.onTextDelta,
     parseOutput: (outputText) => JSON.parse(outputText) as T,
   });
 }
