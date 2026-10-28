@@ -33,6 +33,7 @@ interface BuddyChatProps {
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSave: (() => void) | null;
 }
 
 function LookCard({ look }: { look: LookSpec }) {
@@ -64,7 +65,7 @@ function LookCard({ look }: { look: LookSpec }) {
 }
 
 export default function BuddyChat(props: BuddyChatProps) {
-  const { messages, pending, streaming, hasLook, canUndo, canRedo, online, jobs, onSend, onReset, onUndo, onRedo } = props;
+  const { messages, pending, streaming, hasLook, canUndo, canRedo, online, jobs, onSend, onReset, onUndo, onRedo, onSave } = props;
   const [draft, setDraft] = useState("");
   const [photo, setPhoto] = useState<OutgoingPhoto | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -168,6 +169,9 @@ export default function BuddyChat(props: BuddyChatProps) {
             aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"
           >
             ↷ Redo
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => onSave?.()} disabled={onSave === null || pending}>
+            ♥ Save look
           </button>
           <button type="button" className="btn btn--small" onClick={onReset} disabled={!hasLook || pending}>
             New look
