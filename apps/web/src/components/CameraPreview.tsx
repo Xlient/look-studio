@@ -9,6 +9,8 @@ import {
   stopStream,
 } from "../tracking/camera.ts";
 import type { CameraStatus, VideoDevice } from "../tracking/camera.ts";
+import { useFaceTracker } from "../tracking/use-face-tracker.ts";
+import type { TrackerReadout } from "../tracking/use-face-tracker.ts";
 import Window from "./Window.tsx";
 
 export default function CameraPreview({ look }: { look: LookSpec | null }) {
@@ -91,6 +93,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
 
   const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
   const showing = status === "live" || status === "sample";
+  const { readout } = useFaceTracker(videoRef, showing);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -122,6 +125,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
         <div className="player__lcd" role="status">
           <span className={`led ${status === "live" ? "led--on" : ""}`} aria-hidden="true" />
           {statusMessage(status)}
+          {showing && <span className="player__track">{trackerText(readout)}</span>}
         </div>
         <div className="player__deck">
           {status === "live" ? (
@@ -168,4 +172,19 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
       </div>
     </Window>
   );
+}
+
+function trackerText(readout: TrackerReadout): string {
+  switch (readout.status) {
+    case "loading":
+      return "FACE: loading…";
+    case "error":
+      return "FACE: tracker offline";
+    case "off":
+      return "";
+    case "tracking":
+      return readout.confidence > 0
+        ? `FACE ${Math.round(readout.confidence * 100)}% · ${readout.fps.toFixed(0)} FPS`
+        : `NO FACE · ${readout.fps.toFixed(0)} FPS`;
+  }
 }
