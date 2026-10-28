@@ -12,6 +12,7 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "e2e": "pnpm --filter @look-studio/web e2e",
     "eval": "node eval/run.mjs"
   },
   "devDependencies": {
