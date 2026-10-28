@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import BuddyChat from "./components/BuddyChat.tsx";
 import CameraPreview from "./components/CameraPreview.tsx";
+import LibraryWindow from "./components/LibraryWindow.tsx";
 import ModelMonitor from "./components/ModelMonitor.tsx";
 import Splash from "./components/Splash.tsx";
 import { canRedo, canUndo, summarizeMonitor } from "./studio/studio-state.ts";
 import { historyShortcut } from "./studio/shortcuts.ts";
+import { useFavorites } from "./studio/use-favorites.ts";
 import { useStudio } from "./studio/use-studio.ts";
 import { useWearableJobs } from "./studio/use-wearable-jobs.ts";
 
@@ -19,6 +21,7 @@ function Taskbar() {
       <span className="taskbar__start">✦ LookStart</span>
       <span className="taskbar__task">LookCam</span>
       <span className="taskbar__task">LookArtist</span>
+      <span className="taskbar__task">Favorites</span>
       <span className="taskbar__task">Monitor</span>
       <span className="taskbar__clock">{now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
     </footer>
@@ -26,7 +29,9 @@ function Taskbar() {
 }
 
 function Studio() {
-  const { state, send, reset, undo, redo } = useStudio();
+  const { state, send, reset, undo, redo, wear } = useStudio();
+  const library = useFavorites();
+  const current = state.look;
   const jobs = useWearableJobs(state.look);
   const summary = summarizeMonitor(state.monitor);
 
@@ -65,6 +70,19 @@ function Studio() {
           onReset={reset}
           onUndo={undo}
           onRedo={redo}
+          onSave={current === null ? null : () => library.save(current)}
+        />
+        <LibraryWindow
+          favorites={library.favorites}
+          status={library.status}
+          notice={library.notice}
+          canWear={!state.pending}
+          onWear={wear}
+          onRename={library.rename}
+          onDuplicate={library.duplicate}
+          onRemove={library.remove}
+          onExport={library.exportJson}
+          onImport={library.importJson}
         />
         <ModelMonitor entries={state.monitor} />
       </main>

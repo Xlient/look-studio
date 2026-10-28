@@ -201,3 +201,48 @@ test("the whole chat flow works with the keyboard only", async ({ page }) => {
   await (await chooser).setFiles({ name: "ref.png", mimeType: "image/png", buffer: png });
   await expect(page.getByText("Attached ref.png.")).toBeVisible();
 });
+
+test("favorites survive a reload and round-trip through export", async ({ page }) => {
+  await enterStudio(page);
+  await page.getByLabel("Message LookArtist").fill("Coral glow");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("log", { name: "Conversation" })).toContainText(LOOK.name);
+  await page.getByRole("button", { name: "♥ Save look" }).click();
+
+  const saved = page.getByRole("list", { name: "Saved looks" });
+  await expect(saved.getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByText(`Saved ${LOOK.name}.`)).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: /Enter the Studio/ }).click();
+  await expect(saved.getByRole("listitem")).toHaveCount(1);
+  await expect(saved).toContainText(LOOK.name);
+
+  await saved.getByRole("button", { name: "Rename" }).click();
+  const rename = page.getByLabel(`New name for ${LOOK.name}`);
+  await rename.fill("Date night");
+  await rename.press("Enter");
+  await expect(saved).toContainText("Date night");
+  await saved.getByRole("button", { name: "Duplicate" }).click();
+  await expect(saved.getByRole("listitem")).toHaveCount(2);
+  await expect(saved).toContainText("Date night copy");
+
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export" }).click();
+  const exported = await (await downloading).path();
+
+  for (let remaining = 2; remaining > 0; remaining -= 1) {
+    await saved.getByRole("button", { name: "Delete" }).first().click();
+    await page.keyboard.press("Enter");
+    await expect(saved.getByRole("listitem")).toHaveCount(remaining - 1);
+  }
+  await expect(page.getByText("No favorites yet.")).toBeVisible();
+
+  const choosing = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Import" }).click();
+  await (await choosing).setFiles(exported);
+  await expect(page.getByText("Imported 2 favorites.")).toBeVisible();
+  await expect(saved.getByRole("listitem")).toHaveCount(2);
+
+  await saved.getByRole("button", { name: "Wear" }).first().click();
+  await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Wearing favorite:");
+});
