@@ -5,13 +5,41 @@ import type {
   WearableSpec,
 } from "@look-studio/shared";
 
+export interface ModelCallMeta {
+  model: string;
+  latencyMs: number;
+  tokens: { input: number; output: number; total: number };
+  requestId: string | null;
+  attempts: number;
+}
+
+export interface ServiceResult<T> {
+  data: T;
+  meta: ModelCallMeta;
+}
+
+export class EditUnresolvedError extends Error {
+  constructor() {
+    super("edit_unresolved");
+    this.name = "EditUnresolvedError";
+  }
+}
+
+export const FAKE_META: ModelCallMeta = {
+  model: "offline-fake",
+  latencyMs: 0,
+  tokens: { input: 0, output: 0, total: 0 },
+  requestId: null,
+  attempts: 0,
+};
+
 export interface LookRequest {
   chat: string;
   image?: string;
 }
 
 export interface LookService {
-  createLook(request: LookRequest): Promise<LookSpec>;
+  createLook(request: LookRequest, signal: AbortSignal): Promise<ServiceResult<LookSpec>>;
 }
 
 export interface EditRequest {
@@ -20,7 +48,7 @@ export interface EditRequest {
 }
 
 export interface EditService {
-  edit(request: EditRequest): Promise<EditCommand>;
+  edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditCommand>>;
 }
 
 export interface FitCheckRequest {
@@ -52,16 +80,16 @@ export interface WearableService {
 }
 
 export class FakeLookService implements LookService {
-  async createLook(request: LookRequest): Promise<LookSpec> {
+  async createLook(request: LookRequest): Promise<ServiceResult<LookSpec>> {
     void request;
-    return { id: "look-fake-1", name: "Fake look", wearables: [], style: "casual" };
+    return { data: { id: "look-fake-1", name: "Fake look", wearables: [], style: "casual" }, meta: FAKE_META };
   }
 }
 
 export class FakeEditService implements EditService {
-  async edit(request: EditRequest): Promise<EditCommand> {
+  async edit(request: EditRequest): Promise<ServiceResult<EditCommand>> {
     void request;
-    return { op: "toggle", targetId: "wearable-fake-1" };
+    return { data: { op: "toggle", targetId: "wearable-fake-1" }, meta: FAKE_META };
   }
 }
 

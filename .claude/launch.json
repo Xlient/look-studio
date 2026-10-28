@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "look-studio-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORT=3001", "npx", "-y", "pnpm@12.15.0", "dev"],
+      "port": 5173
+    }
+  ]
+}

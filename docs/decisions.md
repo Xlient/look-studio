@@ -78,3 +78,8 @@ Why each dependency and convention was chosen. All versions are pinned exact
 - P0: added empty @look-studio/core (package files, workspace/vitest registration, recursive typecheck); agent-written.
 - P1: added shared ports (rate-limiter, cache, job-queue, retry-policy, budget-tracker, pose-filter), in-memory server adapters, container.ts injection; agent-written.
 - P1-followup: server depends on @look-studio/shared (workspace:*), package-root type imports; agent-written.
+- P2: hardened model client (typed ModelError, injected RetryPolicy/signal, structured logging, json/image helpers, fake-fetch suite); agent-written.
+- P3: added look/edit/fit-check/wearable routes with injected fake services, body cap, spend/rate guards, SSE job events; agent-written.
+- P4: added web camera device picker, permission states, sample-video fallback, tested camera helpers; agent-written.
+- Phase A: real Muse Spark look/edit services (look-draft.ts, edit-draft.ts, muse-services.ts, services.ts, http.ts, routes/look.ts, routes/edit.ts, container.ts, index.ts; tests drafts.test.ts, muse-services.test.ts); agent-written.
+- Phase B: Y2K desktop UI (App.tsx, components/Window, BuddyChat, ModelMonitor, Splash, CameraPreview restyle, styles.css; studio/api-client, studio-state, look-edits, photo, use-studio; removed PlaceholderPanel; tests studio.test.ts, smoke.test.ts; .claude/launch.json); agent-written.

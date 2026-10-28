@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { defaultRetryPolicy } from "./lib/model-client.ts";
-import { defaultRateLimiter } from "./lib/rate-limit.ts";
+import { MuseEditService, MuseLookService } from "./lib/muse-services.ts";
+import { InMemoryRateLimiter, defaultRateLimiter } from "./lib/rate-limit.ts";
 import {
   FakeEditService,
   FakeFitCheckService,
@@ -17,6 +19,7 @@ import { defaultBudgetTracker } from "./lib/spend-cap.ts";
 
 export interface Container {
   readonly rateLimiter: RateLimiter;
+  readonly modelRateLimiter: RateLimiter;
   readonly budgetTracker: BudgetTracker;
   readonly retryPolicy: RetryPolicy;
   readonly lookService: LookService;
@@ -25,9 +28,13 @@ export interface Container {
   readonly wearableService: WearableService;
 }
 
+// Stand-in until the core token bucket lands; Muse Spark allows 3,000 requests per minute.
+const defaultModelRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 3000, windowMs: 60_000 }));
+
 export function createContainer(overrides: Partial<Container> = {}): Container {
   return {
     rateLimiter: overrides.rateLimiter ?? defaultRateLimiter,
+    modelRateLimiter: overrides.modelRateLimiter ?? defaultModelRateLimiter,
     budgetTracker: overrides.budgetTracker ?? defaultBudgetTracker,
     retryPolicy: overrides.retryPolicy ?? defaultRetryPolicy,
     lookService: overrides.lookService ?? new FakeLookService(),
@@ -38,3 +45,22 @@ export function createContainer(overrides: Partial<Container> = {}): Container {
 }
 
 export const container: Container = createContainer();
+
+export function createLiveContainer(overrides: Partial<Container> = {}): Container {
+  const base = createContainer(overrides);
+  const deps = {
+    retryPolicy: base.retryPolicy,
+    rateLimiter: base.modelRateLimiter,
+    budget: base.budgetTracker,
+    newId: () => randomUUID(),
+  };
+  return {
+    ...base,
+    lookService: overrides.lookService ?? new MuseLookService(deps),
+    editService: overrides.editService ?? new MuseEditService(deps),
+  };
+}
+
+export function createRuntimeContainer(): Container {
+  return process.env.MODEL_API_KEY ? createLiveContainer() : container;
+}

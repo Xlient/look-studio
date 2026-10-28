@@ -3,13 +3,13 @@ import type { Context } from "hono";
 import { z } from "zod";
 import { LookSpec } from "@look-studio/shared";
 import type { BudgetTracker } from "@look-studio/shared";
-import { invalidRequest, readJsonBody, serviceError } from "../lib/http.ts";
+import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { LookService } from "../lib/services.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
 
 const LookRequestBody = z.object({
   chat: z.string().min(1).max(2000),
-  image: z.string().min(1).optional(),
+  image: z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional(),
 });
 
 async function handleLook(c: Context, service: LookService): Promise<Response> {
@@ -24,15 +24,17 @@ async function handleLook(c: Context, service: LookService): Promise<Response> {
     return invalidRequest(c, parsed.error);
   }
   try {
-    const checked = LookSpec.safeParse(
-      await service.createLook({ chat: parsed.data.chat, image: parsed.data.image }),
+    const result = await service.createLook(
+      { chat: parsed.data.chat, image: parsed.data.image },
+      c.req.raw.signal,
     );
+    const checked = LookSpec.safeParse(result.data);
     if (!checked.success) {
       return serviceError(c);
     }
-    return c.json({ ok: true, look: checked.data });
-  } catch {
-    return serviceError(c);
+    return c.json({ ok: true, look: checked.data, meta: result.meta });
+  } catch (error) {
+    return modelErrorResponse(c, error);
   }
 }
 
