@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LookSpec } from "@look-studio/shared";
 import { buildEditPrompt, draftToEditCommand } from "../src/lib/edit-draft.ts";
 import type { EditDraft } from "../src/lib/edit-draft.ts";
-import { buildLookPrompt, clampScale, draftToLookSpec, LookDraftJsonSchema } from "../src/lib/look-draft.ts";
+import { buildLookPrompt, clampScale, draftToLookSpec, LookDraftJsonSchema, MAKEUP_OPACITY_CAP, toMakeup } from "../src/lib/look-draft.ts";
 import type { LookDraft } from "../src/lib/look-draft.ts";
 
 const draft: LookDraft = {
@@ -10,7 +10,18 @@ const draft: LookDraft = {
   description: "Warm gold accents.",
   style: "formal",
   palette: ["#FFD700", "gold", "#c0ffee", "#zzzzzz"],
-  wearables: [{ type: "hat", label: "Crown", region: "head", scale: 1.2 }],
+  wearables: [{ type: "hat", label: "Crown", region: "head", scale: 1.2 }],  makeup: {
+    lipColor: "#c2185b",
+    lipOpacity: 0.7,
+    lipFinish: "gloss",
+    blushColor: "#ff8a80",
+    blushOpacity: 0.3,
+    shadowColor: "#7e57c2",
+    shadowOpacity: 0.5,
+    shadowFinish: "shimmer",
+    browColor: "#4e342e",
+    browOpacity: 0.4,
+  },
 };
 
 const look: LookSpec = {
@@ -25,6 +36,31 @@ function edit(overrides: Partial<EditDraft>): EditDraft {
 }
 
 describe("look drafts", () => {
+  it("maps makeup layers onto the LookSpec", () => {
+    const spec = draftToLookSpec(draft, "look-1");
+    expect(spec?.makeup?.lips).toEqual({ color: "#c2185b", opacity: 0.7, finish: "gloss" });
+    expect(spec?.makeup?.eyeshadow?.finish).toBe("shimmer");
+  });
+
+  it("caps makeup opacity and drops bare or invalid layers", () => {
+    const makeup = toMakeup({
+      ...draft.makeup,
+      lipOpacity: 4,
+      blushColor: "pink",
+      shadowOpacity: 0,
+      browOpacity: Number.NaN,
+    });
+    expect(makeup?.lips?.opacity).toBe(MAKEUP_OPACITY_CAP.lips);
+    expect(makeup?.blush).toBeUndefined();
+    expect(makeup?.eyeshadow).toBeUndefined();
+    expect(makeup?.brows).toBeUndefined();
+  });
+
+  it("omits makeup when every layer is bare", () => {
+    const bare = { ...draft.makeup, lipOpacity: 0, blushOpacity: 0, shadowOpacity: 0, browOpacity: 0 };
+    expect(draftToLookSpec({ ...draft, makeup: bare }, "look-3")?.makeup).toBeUndefined();
+  });
+
   it("maps a draft to a LookSpec, keeping only valid colours", () => {
     const spec = draftToLookSpec(draft, "look-1");
     expect(spec?.name).toBe("Gilded Hour");

@@ -17,6 +17,12 @@
     }
   ],
   "palette": ["#111111", "#f5f5f5"],
+  "makeup": {
+    "lips": { "color": "#c2185b", "opacity": 0.7, "finish": "gloss" },
+    "blush": { "color": "#ff8a80", "opacity": 0.3 },
+    "eyeshadow": { "color": "#7e57c2", "opacity": 0.5, "finish": "shimmer" },
+    "brows": { "color": "#4e342e", "opacity": 0.4 }
+  },
   "style": "casual",
   "createdAt": "2026-10-26T00:00:00.000Z"
 }

@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import type { Makeup } from "@look-studio/shared";
 import type { HeadState } from "../tracking/head-state.ts";
 import { createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
 import type { Viewport } from "./head-anchor.ts";
 import { createLookScene } from "./look-scene.ts";
 import type { LookScene } from "./look-scene.ts";
+import { createMakeupPainter } from "./makeup-painter.ts";
+import { createMakeupGeometry, writeMakeupGeometry } from "./makeup-regions.ts";
+import { makeupPasses } from "./makeup-style.ts";
+import type { MakeupPass } from "./makeup-style.ts";
 
 const OUTPUT_FPS = 30;
 
@@ -14,9 +19,19 @@ interface LookSceneRefs {
   headRef: RefObject<HeadState | null>;
 }
 
-export function useLookScene({ canvasRef, videoRef, headRef }: LookSceneRefs, active: boolean, mirror: boolean) {
+export function useLookScene(
+  { canvasRef, videoRef, headRef }: LookSceneRefs,
+  active: boolean,
+  mirror: boolean,
+  makeup: Makeup | undefined,
+) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
+  const passesRef = useRef<MakeupPass[]>([]);
+
+  useEffect(() => {
+    passesRef.current = makeupPasses(makeup);
+  }, [makeup]);
 
   useEffect(() => {
     viewRef.current.mirror = mirror;
@@ -26,10 +41,14 @@ export function useLookScene({ canvasRef, videoRef, headRef }: LookSceneRefs, ac
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    if (!active || canvas === null || video === null) {
+    const backdrop = document.createElement("canvas");
+    const context = backdrop.getContext("2d");
+    if (!active || canvas === null || video === null || context === null) {
       return;
     }
-    const scene = createLookScene(canvas, video);
+    const painter = createMakeupPainter(context);
+    const geometry = createMakeupGeometry();
+    const scene = createLookScene(canvas, backdrop);
     sceneRef.current = scene;
     scene.setMirror(viewRef.current.mirror);
     const anchor = createHeadAnchor();
@@ -45,9 +64,13 @@ export function useLookScene({ canvasRef, videoRef, headRef }: LookSceneRefs, ac
       if (video.videoWidth !== view.width || video.videoHeight !== view.height) {
         view.width = video.videoWidth;
         view.height = video.videoHeight;
+        backdrop.width = view.width;
+        backdrop.height = view.height;
         scene.resize(view.width, view.height);
       }
-      scene.render(writeHeadAnchor(anchor, headRef.current, view));
+      const head = headRef.current;
+      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passesRef.current, view.width, view.height);
+      scene.render(writeHeadAnchor(anchor, head, view));
     };
     handle = requestAnimationFrame(frame);
 

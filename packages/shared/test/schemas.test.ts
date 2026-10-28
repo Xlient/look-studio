@@ -92,6 +92,19 @@ describe("shared schemas", () => {
     }
   });
 
+  it("validates optional makeup layers", () => {
+    const base = { ...validLook, makeup: undefined };
+    expect(LookSpec.safeParse(base).success).toBe(true);
+    expect(LookSpec.safeParse({ ...base, makeup: { blush: { color: "#ff8a80", opacity: 0.3 } } }).success).toBe(true);
+    for (const lips of [
+      { color: "red", opacity: 0.5, finish: "matte" },
+      { color: "#c2185b", opacity: 1.5, finish: "matte" },
+      { color: "#c2185b", opacity: 0.5, finish: "glitter" },
+    ]) {
+      expect(LookSpec.safeParse({ ...base, makeup: { lips } }).success).toBe(false);
+    }
+  });
+
   it("exports flat, non-recursive JSON Schemas", () => {
     const schemas = {
       LookSpecJsonSchema,

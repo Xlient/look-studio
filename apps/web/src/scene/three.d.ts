@@ -59,8 +59,9 @@ declare module "three" {
     colorSpace: string;
     dispose(): void;
   }
-  export class VideoTexture extends Texture {
-    constructor(video: HTMLVideoElement);
+  export class CanvasTexture extends Texture {
+    constructor(canvas: HTMLCanvasElement);
+    needsUpdate: boolean;
   }
 
   export interface MaterialParameters {
