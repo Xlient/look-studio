@@ -1,8 +1,8 @@
 import type { EditCommand, LookSpec } from "@look-studio/shared";
 import type { CallMeta } from "./api-client.ts";
-import { applyEdit, describeEdit } from "./look-edits.ts";
-import { EMPTY_HISTORY, recordLook, redoLook, undoLook } from "./look-history.ts";
-import type { HistoryStep, LookHistory } from "./look-history.ts";
+import { EMPTY_HISTORY, commitEdit, commitReplace, redoStep, undoStep } from "./edit-history.ts";
+import type { EditHistory, HistoryStep } from "./edit-history.ts";
+import { describeEdit } from "./look-edits.ts";
 
 export const MAX_MONITOR_ENTRIES = 50;
 export const OFFLINE_MODEL = "offline-fake";
@@ -36,7 +36,7 @@ export interface StudioState {
   messages: ChatMessage[];
   monitor: MonitorEntry[];
   look: LookSpec | null;
-  history: LookHistory;
+  history: EditHistory;
   pending: boolean;
   streaming: string;
   nextId: number;
@@ -140,7 +140,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
         pending: false,
         streaming: "",
         look: action.look,
-        history: recordLook(state.history, state.look),
+        history: commitReplace(state.history, state.look, action.look),
         nextId: id + 2,
         messages: [
           ...state.messages,
@@ -152,17 +152,16 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       if (state.look === null) {
         return { ...state, pending: false };
       }
-      const look = applyEdit(state.look, action.command);
+      const step = commitEdit(state.history, state.look, action.command);
+      const look = step === null ? state.look : (step.look ?? state.look);
+      const text = step === null ? "That didn't change the look." : describeEdit(state.look, action.command);
       return {
         ...state,
         pending: false,
         look,
-        history: recordLook(state.history, state.look),
+        history: step === null ? state.history : step.history,
         nextId: id + 2,
-        messages: [
-          ...state.messages,
-          { id, from: "artist", at: action.at, text: describeEdit(state.look, action.command), look },
-        ],
+        messages: [...state.messages, { id, from: "artist", at: action.at, text, look }],
         monitor: pushMonitor(state.monitor, monitorEntry(id + 1, action.at, "edit", action.meta)),
       };
     }
@@ -173,7 +172,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         look: null,
-        history: recordLook(state.history, state.look),
+        history: commitReplace(state.history, state.look, null),
         nextId: id + 1,
         messages: [...state.messages, { id, from: "system", at: action.at, text: "Starting a fresh look." }],
       };
@@ -189,9 +188,9 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
         messages: [...state.messages, { id, from: "system", at: action.at, text: `Wearing favorite: ${action.name}.` }],
       };
     case "undo":
-      return stepTo(state, undoLook(state.history, state.look), action.at, "Undo");
+      return stepTo(state, undoStep(state.history, state.look), action.at, "Undo");
     case "redo":
-      return stepTo(state, redoLook(state.history, state.look), action.at, "Redo");
+      return stepTo(state, redoStep(state.history, state.look), action.at, "Redo");
     case "failed":
       return {
         ...state,

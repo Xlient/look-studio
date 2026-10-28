@@ -1,6 +1,12 @@
 import type { EditCommand, LookSpec, WearableSpec } from "@look-studio/shared";
 
 const MAX_WEARABLES = 20;
+export const MAX_OFFSET = 2;
+export const SCALE_RANGE = { min: 0.1, max: 5 } as const;
+
+function clampOffset(value: number): number {
+  return Math.min(MAX_OFFSET, Math.max(-MAX_OFFSET, value));
+}
 
 function updateWearable(look: LookSpec, id: string, update: (wearable: WearableSpec) => WearableSpec): LookSpec {
   return { ...look, wearables: look.wearables.map((wearable) => (wearable.id === id ? update(wearable) : wearable)) };
@@ -28,7 +34,14 @@ export function applyEdit(look: LookSpec, command: EditCommand): LookSpec {
         const offset = wearable.anchor.offset ?? { x: 0, y: 0, z: 0 };
         return {
           ...wearable,
-          anchor: { ...wearable.anchor, offset: { x: offset.x + delta.x, y: offset.y + delta.y, z: offset.z + delta.z } },
+          anchor: {
+            ...wearable.anchor,
+            offset: {
+              x: clampOffset(offset.x + delta.x),
+              y: clampOffset(offset.y + delta.y),
+              z: clampOffset(offset.z + delta.z),
+            },
+          },
         };
       });
     }
@@ -39,7 +52,7 @@ export function applyEdit(look: LookSpec, command: EditCommand): LookSpec {
       }
       return updateWearable(look, command.targetId, (wearable) => ({
         ...wearable,
-        scale: Math.min(5, Math.max(0.1, (wearable.scale ?? 1) * factor)),
+        scale: Math.min(SCALE_RANGE.max, Math.max(SCALE_RANGE.min, (wearable.scale ?? 1) * factor)),
       }));
     }
     case "recolor": {
