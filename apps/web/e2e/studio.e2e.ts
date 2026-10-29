@@ -140,6 +140,15 @@ test("shows LookArtist working on the chat and camera, and cancels", async ({ pa
   await expect(page.getByLabel("Model call log")).not.toContainText("aborted");
 });
 
+test("the wobble toggle is on by default and works from the keyboard", async ({ page }) => {
+  await enterStudio(page);
+  const wobble = page.getByRole("button", { name: /Wobble/ });
+  await expect(wobble).toHaveAttribute("aria-pressed", "true");
+  await wobble.focus();
+  await page.keyboard.press("Enter");
+  await expect(wobble).toHaveAttribute("aria-pressed", "false");
+});
+
 test("sample video mode works without a camera", async ({ page }) => {
   await enterStudio(page);
   await page.evaluate(async () => {
