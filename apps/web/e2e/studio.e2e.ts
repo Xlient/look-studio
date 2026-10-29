@@ -7,6 +7,7 @@ const LOOK = {
   style: "casual",
   palette: ["#FF6F61"],
   makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" }, skin: { smoothing: 0.4, coverage: "light", finish: "dewy" } },
+  grooming: { facialHair: { style: "stubble", length: 0, density: 0.6, color: "#2b1d14", grey: 0 }, shadowCover: 0.4 },
   wearables: [{ id: "look-e2e-w1", type: "hat", label: "Crown", anchor: { region: "head" }, visible: true }],
 };
 
@@ -117,6 +118,8 @@ test("the touch-up slider follows the look and works from the keyboard", async (
   await page.getByRole("button", { name: /Send/ }).click();
   await expect(slider).toHaveValue("40");
   await expect(page.getByLabel("Coverage")).toHaveValue("light");
+  await expect(page.getByRole("slider", { name: "Stubble cover" })).toHaveValue("40");
+  await expect(page.getByRole("button", { name: "Weekend stubble" })).toBeVisible();
   await page.getByLabel("Coverage").selectOption("full");
   await expect(page.getByLabel("Coverage")).toHaveValue("full");
   await slider.focus();

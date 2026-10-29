@@ -41,6 +41,15 @@ const lookDraft = {
     skinCoverage: "none",
     skinFinish: "natural",
   },
+  grooming: {
+    facialHairStyle: "none",
+    facialHairLength: 0,
+    facialHairDensity: 0,
+    facialHairColor: "",
+    facialHairGrey: 0,
+    browShape: "natural",
+    shadowCover: 0,
+  },
 };
 
 const look: LookSpec = {

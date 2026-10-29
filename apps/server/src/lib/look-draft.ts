@@ -11,6 +11,7 @@ import {
   WearableType,
 } from "@look-studio/shared";
 import type { Makeup, WearableSpec } from "@look-studio/shared";
+import { DraftGrooming, GROOMING_GUIDE, toGrooming } from "./grooming-draft.ts";
 
 export const MAX_DRAFT_WEARABLES = 4;
 export const MAX_PALETTE = 5;
@@ -50,6 +51,7 @@ export const LookDraft = z.object({
   palette: z.array(z.string()),
   wearables: z.array(DraftWearable),
   makeup: DraftMakeup,
+  grooming: DraftGrooming,
 });
 export type LookDraft = z.infer<typeof LookDraft>;
 
@@ -76,6 +78,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
     "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
     ...SKIN_GUIDE,
+    ...GROOMING_GUIDE,
     "- Bold colours are fine when asked, such as pink brows or blue lips; use the exact shade requested.",
     "- name: two to four catchy words. description: one or two sentences.",
     hasImage
@@ -142,6 +145,7 @@ export function draftToLookSpec(draft: LookDraft, lookId: string): LookSpec | nu
     .slice(0, MAX_PALETTE);
   const description = draft.description.trim().slice(0, 500);
   const makeup = toMakeup(draft.makeup);
+  const grooming = toGrooming(draft.grooming);
   const candidate = {
     id: lookId,
     name: clampText(draft.name, 80, "Untitled look"),
@@ -149,6 +153,7 @@ export function draftToLookSpec(draft: LookDraft, lookId: string): LookSpec | nu
     style: draft.style,
     ...(palette.length === 0 ? {} : { palette }),
     ...(makeup === undefined ? {} : { makeup }),
+    ...(grooming === undefined ? {} : { grooming }),
     wearables: draft.wearables
       .slice(0, MAX_DRAFT_WEARABLES)
       .map((wearable, index) => toWearableSpec(wearable, `${lookId}-w${index + 1}`)),

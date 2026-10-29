@@ -3,6 +3,8 @@ import { featherPx } from "./makeup-style.ts";
 import type { MakeupPass } from "./makeup-style.ts";
 import { NO_SKIN } from "./skin-smoother.ts";
 import type { SkinRender, SkinSmoother } from "./skin-smoother.ts";
+import { writePatternTransform } from "./hair-texture.ts";
+import type { HairPatterns, PatternTransform } from "./hair-texture.ts";
 
 export type PaintContext = Pick<
   CanvasRenderingContext2D,
@@ -24,7 +26,8 @@ export type PaintContext = Pick<
 const BLUSH_RADIUS = 0.32;
 const GLOSS_RADIUS = 0.14;
 
-export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | null = null) {
+export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | null = null, hair: HairPatterns | null = null) {
+  const patternTransform: PatternTransform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   const blurFilters = new Map<number, string>();
   const blur = (px: number) => {
     let filter = blurFilters.get(px);
@@ -75,6 +78,15 @@ export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | 
         trace(geometry.rightBrow);
         trace(geometry.leftBrow);
         return;
+      case "mustache":
+        trace(geometry.mustache);
+        return;
+      case "goatee":
+        trace(geometry.goatee);
+        return;
+      case "beard":
+        trace(geometry.beard);
+        return;
     }
   };
 
@@ -100,7 +112,17 @@ export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | 
         ctx.globalCompositeOperation = pass.op;
         ctx.globalAlpha = pass.alpha;
         ctx.filter = blur(featherPx(pass, geometry.eyeDistance));
-        ctx.fillStyle = pass.color;
+        if (pass.texture === undefined) {
+          ctx.fillStyle = pass.color;
+        } else {
+          const pattern = hair?.get(pass.texture) ?? null;
+          if (pattern === null) {
+            ctx.restore();
+            continue;
+          }
+          pattern.setTransform(writePatternTransform(patternTransform, geometry.chin[0] ?? 0, geometry.chin[1] ?? 0, geometry.eyeDistance));
+          ctx.fillStyle = pattern;
+        }
         ctx.beginPath();
         traceRegion(pass, geometry);
         ctx.fill("evenodd");
