@@ -24,10 +24,12 @@ export const DraftMakeup = z.object({
   shadowFinish: ShadowFinish,
   browColor: z.string(),
   browOpacity: z.number(),
+  skinSmoothing: z.number(),
 });
 export type DraftMakeup = z.infer<typeof DraftMakeup>;
 
 export const MAKEUP_OPACITY_CAP = { lips: 0.85, blush: 0.45, eyeshadow: 0.65, brows: 0.8 } as const;
+export const SKIN_SMOOTHING_CAP = 0.7;
 
 export const LookDraft = z.object({
   name: z.string(),
@@ -43,7 +45,6 @@ export const LookDraftJsonSchema = toJSONSchema(LookDraft) as unknown as Record<
 
 const SAFETY_RULES = [
   "Never describe, rate, or comment on the person's face, skin, body, age, or attractiveness.",
-  "Do not suggest skin smoothing, blemish removal, or any change to skin texture.",
 ];
 
 export function buildLookPrompt(chat: string, hasImage: boolean): string {
@@ -53,6 +54,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     `- wearables: at most ${MAX_DRAFT_WEARABLES} virtual 3D props, each anchored to a body region; scale 1 is natural size.`,
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
     "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
+    "- skinSmoothing: 0 to 1 soft-focus touch-up applied on the user's device; use 0 unless they ask for a touch-up, smoothing, an airbrushed or glam finish.",
     "- Bold colours are fine when asked, such as pink brows or blue lips; use the exact shade requested.",
     "- name: two to four catchy words. description: one or two sentences.",
     hasImage
@@ -99,11 +101,13 @@ export function toMakeup(draft: DraftMakeup): Makeup | undefined {
   const blush = tint(draft.blushColor, draft.blushOpacity, MAKEUP_OPACITY_CAP.blush);
   const eyeshadow = tint(draft.shadowColor, draft.shadowOpacity, MAKEUP_OPACITY_CAP.eyeshadow);
   const brows = tint(draft.browColor, draft.browOpacity, MAKEUP_OPACITY_CAP.brows);
+  const smoothing = Number.isFinite(draft.skinSmoothing) ? Math.min(SKIN_SMOOTHING_CAP, draft.skinSmoothing) : 0;
   const makeup: Makeup = {
     ...(lips === null ? {} : { lips: { ...lips, finish: draft.lipFinish } }),
     ...(blush === null ? {} : { blush }),
     ...(eyeshadow === null ? {} : { eyeshadow: { ...eyeshadow, finish: draft.shadowFinish } }),
     ...(brows === null ? {} : { brows }),
+    ...(smoothing > 0 ? { skin: { smoothing } } : {}),
   };
   return Object.keys(makeup).length === 0 ? undefined : makeup;
 }

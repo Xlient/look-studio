@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { LookSpec } from "@look-studio/shared";
 import { buildEditPrompt, draftToEditCommand } from "../src/lib/edit-draft.ts";
 import type { EditDraft } from "../src/lib/edit-draft.ts";
-import { buildLookPrompt, clampScale, draftToLookSpec, LookDraftJsonSchema, MAKEUP_OPACITY_CAP, toMakeup } from "../src/lib/look-draft.ts";
+import {
+  buildLookPrompt,
+  clampScale,
+  draftToLookSpec,
+  LookDraftJsonSchema,
+  MAKEUP_OPACITY_CAP,
+  SKIN_SMOOTHING_CAP,
+  toMakeup,
+} from "../src/lib/look-draft.ts";
 import type { LookDraft } from "../src/lib/look-draft.ts";
 
 const draft: LookDraft = {
@@ -21,6 +29,7 @@ const draft: LookDraft = {
     shadowFinish: "shimmer",
     browColor: "#4e342e",
     browOpacity: 0.4,
+    skinSmoothing: 0,
   },
 };
 
@@ -54,6 +63,14 @@ describe("look drafts", () => {
     expect(makeup?.blush).toBeUndefined();
     expect(makeup?.eyeshadow).toBeUndefined();
     expect(makeup?.brows).toBeUndefined();
+  });
+
+  it("caps skin smoothing and drops it at zero or when invalid", () => {
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0.4 })?.skin).toEqual({ smoothing: 0.4 });
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 3 })?.skin).toEqual({ smoothing: SKIN_SMOOTHING_CAP });
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0 })?.skin).toBeUndefined();
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: -1 })?.skin).toBeUndefined();
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: Number.NaN })?.skin).toBeUndefined();
   });
 
   it("omits makeup when every layer is bare", () => {
@@ -91,6 +108,7 @@ describe("look drafts", () => {
   it("builds a prompt with safety rules and the image hint", () => {
     expect(buildLookPrompt("gold crown", true)).toContain("reference photo is attached");
     expect(buildLookPrompt("gold crown", false)).toContain("Never describe, rate, or comment");
+    expect(buildLookPrompt("glam", false)).toContain("skinSmoothing: 0 to 1");
   });
 
   it("exports a strict, shallow JSON schema", () => {

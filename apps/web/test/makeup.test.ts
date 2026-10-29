@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Makeup } from "@look-studio/shared";
 import { createMakeupPainter } from "../src/scene/makeup-painter.ts";
+import type { SkinSmoother } from "../src/scene/skin-smoother.ts";
 import type { PaintContext } from "../src/scene/makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "../src/scene/makeup-regions.ts";
 import { featherPx, isVividTint, makeupPasses } from "../src/scene/makeup-style.ts";
@@ -58,6 +59,9 @@ describe("writeMakeupGeometry", () => {
     expect(geometry.lipsInner.count).toBe(20);
     expect(geometry.rightShadow.count).toBe(14);
     expect(geometry.leftBrow.count).toBe(10);
+    expect(geometry.faceOval.count).toBe(36);
+    expect(geometry.rightEye.count).toBe(16);
+    expect(geometry.leftEye.count).toBe(16);
     expect(geometry.eyeDistance).toBeCloseTo(128);
     expect(Math.max(...geometry.lipsOuter.points)).toBeLessThanOrEqual(640);
   });
@@ -143,6 +147,23 @@ describe("createMakeupPainter", () => {
     expect(calls[0]).toBe("drawImage");
     expect(calls.filter((call) => call.startsWith("fill"))).toEqual(["fill:evenodd:multiply", "fill:evenodd:screen"]);
     expect(calls.filter((call) => call === "save").length).toBe(calls.filter((call) => call === "restore").length);
+  });
+
+  it("touches up the skin after the frame and before makeup", () => {
+    const { ctx, calls } = recordingContext();
+    const strengths: number[] = [];
+    const smoother = {
+      apply: (_target: unknown, _source: unknown, _geometry: unknown, strength: number) => {
+        calls.push(`smooth:${strength}`);
+        strengths.push(strength);
+      },
+    };
+    const geometry = writeMakeupGeometry(createMakeupGeometry(), face(), 640, 480);
+    const painter = createMakeupPainter(ctx, smoother as unknown as SkinSmoother);
+    painter.paint({} as CanvasImageSource, geometry, makeupPasses({ lips: FULL.lips }), 640, 480, 0.4);
+    expect(calls.slice(0, 2)).toEqual(["drawImage", "smooth:0.4"]);
+    painter.paint({} as CanvasImageSource, createMakeupGeometry(), [], 640, 480, 0.4);
+    expect(strengths).toEqual([0.4]);
   });
 
   it("draws only the video frame when no face is tracked", () => {

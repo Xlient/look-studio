@@ -19,6 +19,8 @@ video file works too via **Sample video**).
   placeholder crown, a mirror toggle, and a 30 fps output loop.
 - **Makeup:** landmark-region polygons composited with blend modes and
   feathering, driven by the `makeup` block of a `LookSpec`.
+- **Skin touch-up:** an optional soft-focus pass on the face skin (eyes, brows,
+  and lips left sharp), set by a Touch-up slider or a look's `makeup.skin`.
 - **Chat:** looks stream from `POST /api/look/stream` (server-sent events);
   edits go through `POST /api/edit`. Occasion chips, a subtle-to-bold vibe
   dial, a consent step before a reference photo is sent, undo and redo
@@ -76,8 +78,8 @@ queue, pose filter) and runs on simple in-memory implementations until the
   explicitly attaches, after a consent step, is sent to Muse Spark.
 - No images are logged or stored. Favorites keep look data only.
 - Only Standard-mode Meta models are used for anything that may contain a face.
-- Prompts tell the model never to comment on faces or skin; there is no skin
-  analysis, smoothing, or blemish detection.
+- Prompts tell the model never to comment on faces or skin. Skin touch-up runs
+  only in the browser from face landmarks; no frame or skin data goes to a model.
 - The API key lives only on the server (`MODEL_API_KEY`). It is never in the
   client bundle.
 

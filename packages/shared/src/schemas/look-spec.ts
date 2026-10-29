@@ -22,6 +22,7 @@ export const Makeup = z.object({
   blush: TintLayer.optional(),
   eyeshadow: TintLayer.extend({ finish: ShadowFinish }).optional(),
   brows: TintLayer.optional(),
+  skin: z.object({ smoothing: Opacity }).optional(),
 });
 export type Makeup = z.infer<typeof Makeup>;
 

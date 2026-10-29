@@ -20,6 +20,9 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
   const [plain, setPlain] = useState(false);
+  const [touchUp, setTouchUp] = useState(0);
+  const lookId = look?.id;
+  const lookSmoothing = look?.makeup?.skin?.smoothing;
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -40,6 +43,12 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
       return () => URL.revokeObjectURL(sampleUrl);
     }
   }, [sampleUrl]);
+
+  useEffect(() => {
+    if (lookSmoothing !== undefined) {
+      setTouchUp(Math.round(lookSmoothing * 100));
+    }
+  }, [lookId, lookSmoothing]);
 
   const refreshDevices = async () => {
     try {
@@ -100,7 +109,7 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
   const wearables = useMemo(() => wearableLayout(look), [look]);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables, touchUp / 100);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -169,6 +178,20 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
               }}
             />
           </label>
+        </div>
+        <div className="player__touchup">
+          <label htmlFor="touch-up">✨ Touch-up</label>
+          <input
+            id="touch-up"
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={touchUp}
+            aria-valuetext={touchUp === 0 ? "off" : `${touchUp}%`}
+            onChange={(event) => setTouchUp(Number(event.target.value))}
+          />
+          <output htmlFor="touch-up">{touchUp === 0 ? "off" : `${touchUp}%`}</output>
         </div>
         <div className="player__source">
           <label htmlFor="camera-device">Source</label>

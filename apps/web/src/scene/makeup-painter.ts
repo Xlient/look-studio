@@ -1,6 +1,7 @@
 import type { MakeupGeometry, Polygon } from "./makeup-regions.ts";
 import { featherPx } from "./makeup-style.ts";
 import type { MakeupPass } from "./makeup-style.ts";
+import type { SkinSmoother } from "./skin-smoother.ts";
 
 export type PaintContext = Pick<
   CanvasRenderingContext2D,
@@ -22,7 +23,7 @@ export type PaintContext = Pick<
 const BLUSH_RADIUS = 0.32;
 const GLOSS_RADIUS = 0.14;
 
-export function createMakeupPainter(ctx: PaintContext) {
+export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | null = null) {
   const blurFilters = new Map<number, string>();
   const blur = (px: number) => {
     let filter = blurFilters.get(px);
@@ -77,7 +78,14 @@ export function createMakeupPainter(ctx: PaintContext) {
   };
 
   return {
-    paint(source: CanvasImageSource, geometry: MakeupGeometry, passes: readonly MakeupPass[], width: number, height: number) {
+    paint(
+      source: CanvasImageSource,
+      geometry: MakeupGeometry,
+      passes: readonly MakeupPass[],
+      width: number,
+      height: number,
+      touchUp = 0,
+    ) {
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
       ctx.filter = "none";
@@ -85,6 +93,7 @@ export function createMakeupPainter(ctx: PaintContext) {
       if (!geometry.visible) {
         return;
       }
+      smoother?.apply(ctx, source, geometry, touchUp, width, height);
       for (const pass of passes) {
         ctx.save();
         ctx.globalCompositeOperation = pass.op;
