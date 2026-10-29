@@ -22,6 +22,7 @@ export function useStudio(): {
   undo: () => void;
   redo: () => void;
   wear: (look: LookSpec, name: string) => void;
+  cancel: () => void;
 } {
   const [state, dispatch] = useReducer(studioReducer, undefined, () => initialStudioState(clockTime()));
   const stateRef = useRef(state);
@@ -42,6 +43,7 @@ export function useStudio(): {
     dispatch({
       type: "sent",
       at: clockTime(),
+      call,
       text,
       ...(photo === null ? {} : { attachment: photo.name }),
       ...(note === undefined ? {} : { note }),
@@ -66,6 +68,7 @@ export function useStudio(): {
     );
   }, []);
 
+  const cancel = useCallback(() => controllerRef.current?.abort(), []);
   const reset = useCallback(() => dispatch({ type: "reset", at: clockTime() }), []);
   const undo = useCallback(() => dispatch({ type: "undo", at: clockTime() }), []);
   const redo = useCallback(() => dispatch({ type: "redo", at: clockTime() }), []);
@@ -75,5 +78,5 @@ export function useStudio(): {
     [],
   );
 
-  return { state, send, reset, undo, redo, wear };
+  return { state, send, reset, undo, redo, wear, cancel };
 }

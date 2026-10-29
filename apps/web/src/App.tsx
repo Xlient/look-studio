@@ -7,6 +7,7 @@ import Splash from "./components/Splash.tsx";
 import { canRedo, canUndo, summarizeMonitor } from "./studio/studio-state.ts";
 import { historyShortcut } from "./studio/shortcuts.ts";
 import { useFavorites } from "./studio/use-favorites.ts";
+import { thinkingTitle, typicalLatencyMs } from "./studio/thinking.ts";
 import { useStudio } from "./studio/use-studio.ts";
 import { useWearableJobs } from "./studio/use-wearable-jobs.ts";
 
@@ -29,7 +30,7 @@ function Taskbar() {
 }
 
 function Studio() {
-  const { state, send, reset, undo, redo, wear } = useStudio();
+  const { state, send, reset, undo, redo, wear, cancel } = useStudio();
   const library = useFavorites();
   const current = state.look;
   const jobs = useWearableJobs(state.look);
@@ -52,14 +53,17 @@ function Studio() {
   }, [undo, redo]);
 
   const succeeded = state.monitor.some((entry) => entry.ok);
+  const pendingCall = state.pendingCall;
+  const thinking = pendingCall === null ? null : { call: pendingCall, typicalMs: typicalLatencyMs(state.monitor, pendingCall) };
   return (
     <div className="desktop">
       <h1 className="sr-only">Look Studio</h1>
       <main className="desktop__grid">
-        <CameraPreview look={state.look} />
+        <CameraPreview look={state.look} thinking={thinking === null ? null : thinkingTitle(thinking.call)} />
         <BuddyChat
           messages={state.messages}
           pending={state.pending}
+          thinking={thinking}
           streaming={state.streaming}
           hasLook={state.look !== null}
           canUndo={canUndo(state)}
@@ -71,6 +75,7 @@ function Studio() {
           onUndo={undo}
           onRedo={redo}
           onSave={current === null ? null : () => library.save(current)}
+          onCancel={cancel}
         />
         <LibraryWindow
           favorites={library.favorites}

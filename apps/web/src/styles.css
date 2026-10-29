@@ -436,6 +436,23 @@ body {
   animation: marquee 14s linear infinite;
 }
 
+.player__thinking {
+  position: absolute;
+  inset: 10px 10px auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #fff;
+  font: bold 13px var(--ui);
+  text-align: center;
+  background: rgb(107 47 179 / 0.85);
+  box-shadow: 0 0 12px rgb(196 155 255 / 0.7);
+}
+
+.player__thinking-spark {
+  display: inline-block;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
 .player__lcd {
   display: flex;
   align-items: center;
@@ -666,6 +683,41 @@ body {
 
 .im-caret {
   animation: blink 1s steps(1) infinite;
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--grape);
+  border-radius: 8px;
+  background: #f1e8ff;
+  color: var(--ink);
+}
+
+.thinking__spark {
+  color: var(--grape);
+  font-size: 18px;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.thinking__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-weight: bold;
+}
+
+.thinking__dots::after {
+  content: "…";
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.thinking__meta {
+  color: var(--muted);
+  font: 12px var(--mono);
 }
 
 @keyframes blink {
@@ -955,7 +1007,10 @@ body {
   .player__ticker span,
   .player__idle-logo,
   .splash__new,
-  .im-caret {
+  .im-caret,
+  .thinking__spark,
+  .thinking__dots::after,
+  .player__thinking-spark {
     animation: none;
   }
 

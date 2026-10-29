@@ -130,7 +130,7 @@ describe("wearing a favorite", () => {
   });
 
   it("is ignored while a call is pending", () => {
-    const pending = studioReducer(initialStudioState("9:00"), { type: "sent", at: "9:01", text: "gold" });
+    const pending = studioReducer(initialStudioState("9:00"), { type: "sent", at: "9:01", call: "look", text: "gold" });
     expect(studioReducer(pending, { type: "look-loaded", at: "9:02", look, name: "x" })).toBe(pending);
   });
 });
