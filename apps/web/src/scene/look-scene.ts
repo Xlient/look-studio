@@ -17,13 +17,14 @@ import type { HeadAnchor } from "./head-anchor.ts";
 import { EMPTY_LAYOUT } from "./wearable-layout.ts";
 import type { WearableLayout, WearableSlot } from "./wearable-layout.ts";
 import { buildCrown, buildGlasses, buildHat } from "./wearable-templates.ts";
+import type { Wobble } from "./wobble.ts";
 import type { WearableTemplate } from "./wearable-templates.ts";
 
 export interface LookScene {
   resize(width: number, height: number): void;
   setMirror(mirror: boolean): void;
   setWearables(layout: WearableLayout): void;
-  render(anchor: HeadAnchor): void;
+  render(anchor: HeadAnchor, wobble: Wobble): void;
   dispose(): void;
 }
 
@@ -103,7 +104,7 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
       backdrop.scale.set(mirror ? -width : width, backdrop.scale.y, 1);
     },
     setWearables,
-    render(anchor) {
+    render(anchor, wobble) {
       texture.needsUpdate = true;
       headPivot.visible = anchor.visible;
       eyesPivot.visible = anchor.visible;
@@ -114,6 +115,8 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
         headPivot.position.set(anchor.x, anchor.y, 0);
         eyesPivot.position.set(anchor.eyesX, anchor.eyesY, 0);
         headPivot.scale.set(anchor.scale, anchor.scale, anchor.scale);
+        crownHolder.rotation.z = hatHolder.rotation.z = wobble.roll.position;
+        crownHolder.rotation.x = hatHolder.rotation.x = wobble.pitch.position;
         eyesPivot.scale.set(anchor.scale, anchor.scale, anchor.scale);
       }
       renderer.render(scene, camera);
