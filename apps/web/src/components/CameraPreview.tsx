@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LookSpec } from "@look-studio/shared";
 import {
   listVideoDevices,
@@ -12,6 +12,7 @@ import type { CameraStatus, VideoDevice } from "../tracking/camera.ts";
 import { useFaceTracker } from "../tracking/use-face-tracker.ts";
 import type { TrackerReadout } from "../tracking/use-face-tracker.ts";
 import { useLookScene } from "../scene/use-look-scene.ts";
+import { wearableLayout } from "../scene/wearable-layout.ts";
 import Window from "./Window.tsx";
 
 export default function CameraPreview({ look }: { look: LookSpec | null }) {
@@ -98,7 +99,8 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
   const wearing = look?.wearables.filter((wearable) => wearable.visible !== false).map((wearable) => wearable.label) ?? [];
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain);
+  const wearables = useMemo(() => wearableLayout(look), [look]);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">

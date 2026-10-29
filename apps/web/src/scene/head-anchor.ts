@@ -11,6 +11,8 @@ export interface HeadAnchor {
   visible: boolean;
   x: number;
   y: number;
+  eyesX: number;
+  eyesY: number;
   scale: number;
   readonly rotation: Float32Array;
 }
@@ -24,7 +26,7 @@ export interface Viewport {
 export function createHeadAnchor(): HeadAnchor {
   const rotation = new Float32Array(16);
   rotation[0] = rotation[5] = rotation[10] = rotation[15] = 1;
-  return { visible: false, x: 0, y: 0, scale: 1, rotation };
+  return { visible: false, x: 0, y: 0, eyesX: 0, eyesY: 0, scale: 1, rotation };
 }
 
 const point = (state: HeadState, index: number, axis: number) => state.landmarks[index * 3 + axis] ?? 0;
@@ -54,6 +56,10 @@ export function writeHeadAnchor(out: HeadAnchor, state: HeadState | null, view: 
   const upY = out.rotation[5] ?? 1;
   out.x = flip * (point(state, FOREHEAD, 0) - 0.5) * view.width + upX * distance * CROWN_LIFT;
   out.y = (0.5 - point(state, FOREHEAD, 1)) * view.height + upY * distance * CROWN_LIFT;
+  const eyesX = (point(state, LEFT_EYE_OUTER, 0) + point(state, RIGHT_EYE_OUTER, 0)) / 2;
+  const eyesY = (point(state, LEFT_EYE_OUTER, 1) + point(state, RIGHT_EYE_OUTER, 1)) / 2;
+  out.eyesX = flip * (eyesX - 0.5) * view.width;
+  out.eyesY = (0.5 - eyesY) * view.height;
   out.scale = distance;
   out.visible = true;
   return out;

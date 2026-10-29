@@ -5,6 +5,7 @@ import type { HeadState } from "../tracking/head-state.ts";
 import { createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
 import type { Viewport } from "./head-anchor.ts";
 import { createLookScene } from "./look-scene.ts";
+import type { WearableLayout } from "./wearable-layout.ts";
 import type { LookScene } from "./look-scene.ts";
 import { createMakeupPainter } from "./makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "./makeup-regions.ts";
@@ -26,12 +27,19 @@ export function useLookScene(
   mirror: boolean,
   makeup: Makeup | undefined,
   plain: boolean,
+  wearables: WearableLayout,
 ) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
   const passesRef = useRef<MakeupPass[]>([]);
   const plainRef = useRef(plain);
   plainRef.current = plain;
+  const wearablesRef = useRef(wearables);
+
+  useEffect(() => {
+    wearablesRef.current = wearables;
+    sceneRef.current?.setWearables(wearables);
+  }, [wearables]);
 
   useEffect(() => {
     passesRef.current = makeupPasses(makeup);
@@ -55,6 +63,7 @@ export function useLookScene(
     const scene = createLookScene(canvas, backdrop);
     sceneRef.current = scene;
     scene.setMirror(viewRef.current.mirror);
+    scene.setWearables(wearablesRef.current);
     const anchor = createHeadAnchor();
     const gate = createFrameGate(OUTPUT_FPS);
     const view = viewRef.current;
