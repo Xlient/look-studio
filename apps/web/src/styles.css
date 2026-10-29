@@ -227,6 +227,7 @@ body {
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   grid-template-areas:
     "camera chat"
+    "avatar chat"
     "library chat"
     "monitor chat";
   gap: 20px;
@@ -250,6 +251,88 @@ body {
 
 .win--library {
   grid-area: library;
+}
+
+.win--avatar {
+  grid-area: avatar;
+}
+
+.avatar__form,
+.avatar__wait {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.avatar__form textarea {
+  font: inherit;
+  resize: vertical;
+}
+
+.avatar__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.avatar__note {
+  margin: 0;
+  font-size: 0.85em;
+}
+
+.avatar__error {
+  margin: 0;
+  color: #9b1c1c;
+  font-weight: 700;
+}
+
+.avatar__choose {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.avatar__concepts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+
+.avatar__concept {
+  padding: 4px;
+  border: 2px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+
+.avatar__concept:hover,
+.avatar__concept:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.avatar__concept-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+}
+
+.avatar__confirm {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.avatar__confirm p {
+  margin: 0 0 8px;
+}
+
+.avatar__wait progress {
+  width: 100%;
+  height: 18px;
 }
 
 .library__toolbar {
@@ -1053,6 +1136,7 @@ body {
     grid-template-areas:
       "camera"
       "chat"
+      "avatar"
       "library"
       "monitor";
   }

@@ -5,7 +5,7 @@ export const RIGHT_EYE_OUTER = 33;
 export const LEFT_EYE_OUTER = 263;
 
 const CROWN_LIFT = 0.45;
-const MIN_CONFIDENCE = 0.5;
+export const MIN_CONFIDENCE = 0.5;
 
 export interface HeadAnchor {
   visible: boolean;
