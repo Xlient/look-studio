@@ -49,6 +49,7 @@ export type StudioAction =
   | { type: "edit-received"; at: string; command: EditCommand; meta: CallMeta }
   | { type: "failed"; at: string; call: CallKind; error: string; message: string }
   | { type: "reset"; at: string }
+  | { type: "look-loaded"; at: string; look: LookSpec; name: string }
   | { type: "undo"; at: string }
   | { type: "redo"; at: string };
 
@@ -174,6 +175,17 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
         history: commitReplace(state.history, state.look, null),
         nextId: id + 1,
         messages: [...state.messages, { id, from: "system", at: action.at, text: "Starting a fresh look." }],
+      };
+    case "look-loaded":
+      if (state.pending) {
+        return state;
+      }
+      return {
+        ...state,
+        look: action.look,
+        history: commitReplace(state.history, state.look, action.look),
+        nextId: id + 1,
+        messages: [...state.messages, { id, from: "system", at: action.at, text: `Wearing favorite: ${action.name}.` }],
       };
     case "undo":
       return stepTo(state, undoStep(state.history, state.look), action.at, "Undo");

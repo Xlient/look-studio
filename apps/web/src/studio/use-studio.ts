@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
+import type { LookSpec } from "@look-studio/shared";
 import { errorMessage, requestEdit, streamLook } from "./api-client.ts";
 import { composePrompt, contextNote } from "./prompt-compose.ts";
 import type { LookContext } from "./prompt-compose.ts";
@@ -20,6 +21,7 @@ export function useStudio(): {
   reset: () => void;
   undo: () => void;
   redo: () => void;
+  wear: (look: LookSpec, name: string) => void;
 } {
   const [state, dispatch] = useReducer(studioReducer, undefined, () => initialStudioState(clockTime()));
   const stateRef = useRef(state);
@@ -68,5 +70,10 @@ export function useStudio(): {
   const undo = useCallback(() => dispatch({ type: "undo", at: clockTime() }), []);
   const redo = useCallback(() => dispatch({ type: "redo", at: clockTime() }), []);
 
-  return { state, send, reset, undo, redo };
+  const wear = useCallback(
+    (look: LookSpec, name: string) => dispatch({ type: "look-loaded", at: clockTime(), look, name }),
+    [],
+  );
+
+  return { state, send, reset, undo, redo, wear };
 }
