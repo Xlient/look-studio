@@ -1,48 +1,150 @@
 # Look Studio
 
-Hackathon scaffold: virtual try-on studio. Structure, config, and smoke tests
-only — no features are implemented yet.
+Look Studio puts live makeup and accessories on your webcam image for video
+calls. Describe a vibe ("golden crown + warm glow") or attach a reference photo,
+and Meta's Muse Spark designs a look: a palette, four makeup layers (lips,
+blush, eyeshadow, brows), and wearables. The browser tracks your face and
+renders the look onto the output canvas in real time. Follow-up messages such
+as "move the crown higher" become small, validated edits.
 
-## Stack
+**Live demo:** https://lookstudio-3fe3d.web.app (Chrome, with a webcam; a local
+video file works too via **Sample video**).
 
-TypeScript everywhere in a pnpm workspace:
+## What works today
 
-- `apps/web` — Vite + React client (camera preview + placeholder panel).
-- `apps/server` — Node + Hono API (health, model smoke route, limits).
-- `packages/shared` — Zod schemas with JSON Schema export.
+- **Face tracking:** MediaPipe Face Landmarker (478 landmarks, head pose) on the
+  GPU, with an FPS and confidence readout. A pose-filter hook is in place for
+  smoothing; no filter is plugged in yet.
+- **Rendering:** a three.js scene in video-pixel space with a head-anchored
+  placeholder crown, a mirror toggle, and a 30 fps output loop.
+- **Makeup:** landmark-region polygons composited with blend modes and
+  feathering, driven by the `makeup` block of a `LookSpec`.
+- **Chat:** looks stream from `POST /api/look/stream` (server-sent events);
+  edits go through `POST /api/edit`. Occasion chips, a subtle-to-bold vibe
+  dial, a consent step before a reference photo is sent, undo and redo
+  (buttons and Ctrl/Cmd+Z), and a **Plain camera** toggle.
+- **Wearable jobs:** generating, fitting, passed, or failed chips driven by
+  `POST /api/wearable` and its event stream. The server uses a fake job
+  service until a 3D provider is connected.
+- **Favorites:** saved in the browser (IndexedDB) with rename, duplicate,
+  delete, and JSON export and import. Thumbnails are drawn from the look's
+  colours, never from the camera.
+- **Model monitor:** every model call with model name, latency, tokens, and
+  request id.
 
-See `SCAFFOLD_PLAN.md` for the exact folder layout and `docs/decisions.md` for
-why each dependency was chosen.
+Not built yet: real 3D wearable generation, SAM segmentation, the agent loops
+(Look Director, Fit Critic), and the core algorithms in `packages/core`. See
+[Known limits](#known-limits).
 
-## Quickstart
+## Architecture
 
-Requires Node >= 22.6 and pnpm.
+```text
+Browser (apps/web)
+  camera or sample video
+    -> MediaPipe Face Landmarker -> HeadState (landmarks + pose, reused buffers)
+    -> makeup painter (2D canvas) -> three.js scene (backdrop + head anchor) -> output canvas
+  chat, favorites (IndexedDB), undo stack, model monitor
+        |
+        |  same origin: /api/**
+        v
+Firebase Hosting (static web)  --rewrite /api/**-->  Cloud Run: apps/server (Hono)
+                                                       per-IP rate limit, daily spend cap,
+                                                       body cap, Zod validation
+                                                         |
+                                                         v
+                                               Meta Model API (Responses API)
+                                               muse-spark-1.3, structured output
+```
+
+Packages:
+
+| Path | Role |
+| --- | --- |
+| `apps/web` | Vite + React client: tracking, rendering, chat, favorites |
+| `apps/server` | Node + Hono API: look, edit, fit-check, and wearable routes; model client |
+| `packages/shared` | Zod schemas (`LookSpec`, `EditCommand`, `WearableSpec`, ...) and ports |
+| `packages/core` | Hand-written algorithms (cache, masks, fit, limits); not implemented yet |
+| `eval` | Eval runner: run folders, CSV, and summaries for a pluggable harness |
+
+The server depends on ports (rate limiter, retry policy, budget tracker, job
+queue, pose filter) and runs on simple in-memory implementations until the
+`packages/core` versions land.
+
+## Privacy and safety
+
+- Camera frames never leave the browser. Only a reference photo the user
+  explicitly attaches, after a consent step, is sent to Muse Spark.
+- No images are logged or stored. Favorites keep look data only.
+- Only Standard-mode Meta models are used for anything that may contain a face.
+- Prompts tell the model never to comment on faces or skin; there is no skin
+  analysis, smoothing, or blemish detection.
+- The API key lives only on the server (`MODEL_API_KEY`). It is never in the
+  client bundle.
+
+## Run it locally
+
+Requires Node 24 (Node >= 22.6 works for the server) and pnpm 12.
 
 ```sh
 pnpm install
-cp .env.example .env   # fill in values; never commit .env
-pnpm dev               # web on http://localhost:5173, server on :3001
+cp .env.example .env   # set MODEL_API_KEY; never commit .env
+pnpm dev               # web on http://localhost:5173, API on :3001
 ```
+
+Without `MODEL_API_KEY` the server answers with offline fakes, so the UI still
+works.
+
+Server settings (environment variables):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MODEL_API_KEY` | required for live calls | Meta Model API key |
+| `PORT` | 3001 | API port |
+| `DAILY_SPEND_CAP_USD` | 5 | Estimated model spend per day before requests are refused |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | 60 / 60000 | Requests per IP per window |
+| `MODEL_TIMEOUT_MS` | 30000 | Per-call model timeout |
+| `MODEL_MAX_RETRIES` | 3 | Retries on HTTP 429, honoring `Retry-After` |
+| `LOOK_REASONING_EFFORT` | low | `minimal`, `low`, `medium`, or `high` for look calls |
+| `BODY_MAX_BYTES` | 5000000 | Request body cap |
 
 ## Scripts
 
-| Command          | What it does                              |
-| ---------------- | ----------------------------------------- |
-| `pnpm dev`       | Web + server together (concurrently)      |
-| `pnpm build`     | Recursive build of every package          |
-| `pnpm test`      | Vitest over the workspace projects        |
-| `pnpm typecheck` | `tsc --noEmit` at root + every package    |
-| `pnpm eval`      | Placeholder eval runner (exits 0)         |
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Web and server together |
+| `pnpm build` | Build every package |
+| `pnpm typecheck` | `tsc --noEmit` for the root, `eval`, and every package |
+| `pnpm test` | Vitest across web, server, shared, core, and eval |
+| `pnpm e2e` | Playwright on a production build with a fake camera |
+| `pnpm eval --harness <file.ts> --cases <cases.json>` | Run an eval harness (see `eval/README.md`) |
 
-## Smoke test
+## Deploy
 
-```sh
-curl localhost:3001/health
-curl -X POST localhost:3001/api/ping-model   # needs MODEL_API_KEY + MODEL_NAME
-```
+Pushes to `main` run `.github/workflows/deploy.yml`: build and boot-check the
+API image, deploy it to Cloud Run (one instance, key from Secret Manager), deploy
+the web build to Firebase Hosting, then smoke-check `/` and `/api/health`.
+GitHub authenticates to Google Cloud with Workload Identity Federation, so no
+keys are stored in the repository. Pull requests get a Hosting preview channel.
+
+## Known limits
+
+- Hosting buffers server-sent events, so a streamed look arrives all at once
+  when served through the public URL.
+- Requests forwarded by Hosting time out after 60 s.
+- The in-memory spend cap and rate limits reset when Cloud Run scales to zero.
+- Per-IP limits use the first `X-Forwarded-For` entry, which a client can spoof.
+- The crown is a procedural placeholder with no occlusion behind the head.
+- Wearable jobs and fit checks use fake services; real generation is not
+  connected yet.
+- Measured results (fit, edit accuracy, latency, cost): TBD, pending the eval
+  harness.
 
 ## Network policy
 
-The server calls only `https://api.meta.ai/v1`. The client makes no network
-calls of its own (system fonts, no analytics). Vite proxies `/api` to the
-server during development.
+The server calls only `https://api.meta.ai/v1`. The browser calls the Look
+Studio API and downloads the MediaPipe face model from Google storage; the
+MediaPipe WebAssembly files ship with the app. It sends no analytics or
+telemetry.
+
+See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for what was built during the event
+and which third-party libraries and services are used.
