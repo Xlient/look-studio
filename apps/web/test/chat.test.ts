@@ -65,7 +65,7 @@ describe("studio undo and streaming", () => {
 
   it("ignores undo while a call is pending and a reset with no look", () => {
     let state = studioReducer(initialStudioState("9:00"), { type: "look-received", at: "9:01", look: gold, meta });
-    state = studioReducer(state, { type: "sent", at: "9:02", text: "more" });
+    state = studioReducer(state, { type: "sent", at: "9:02", call: "look", text: "more" });
     expect(canUndo(state)).toBe(false);
     expect(studioReducer(state, { type: "undo", at: "9:03" })).toBe(state);
     const empty = initialStudioState("9:00");
@@ -75,7 +75,7 @@ describe("studio undo and streaming", () => {
   it("accumulates streamed text only while pending and clears it on reply", () => {
     let state = initialStudioState("9:00");
     expect(studioReducer(state, { type: "streamed", text: "late" }).streaming).toBe("");
-    state = studioReducer(state, { type: "sent", at: "9:01", text: "gold", note: "party · bold" });
+    state = studioReducer(state, { type: "sent", at: "9:01", call: "look", text: "gold", note: "party · bold" });
     state = studioReducer(state, { type: "streamed", text: "Warm " });
     state = studioReducer(state, { type: "streamed", text: "glow." });
     expect(state.streaming).toBe("Warm glow.");

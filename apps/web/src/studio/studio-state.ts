@@ -38,12 +38,13 @@ export interface StudioState {
   look: LookSpec | null;
   history: EditHistory;
   pending: boolean;
+  pendingCall: CallKind | null;
   streaming: string;
   nextId: number;
 }
 
 export type StudioAction =
-  | { type: "sent"; at: string; text: string; attachment?: string; note?: string }
+  | { type: "sent"; at: string; call: CallKind; text: string; attachment?: string; note?: string }
   | { type: "streamed"; text: string }
   | { type: "look-received"; at: string; look: LookSpec; meta: CallMeta }
   | { type: "edit-received"; at: string; command: EditCommand; meta: CallMeta }
@@ -63,6 +64,7 @@ export function initialStudioState(at: string): StudioState {
     look: null,
     history: EMPTY_HISTORY,
     pending: false,
+    pendingCall: null,
     streaming: "",
     nextId: 2,
   };
@@ -118,6 +120,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         pending: true,
+        pendingCall: action.call,
         streaming: "",
         nextId: id + 1,
         messages: [
@@ -138,6 +141,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         pending: false,
+        pendingCall: null,
         streaming: "",
         look: action.look,
         history: commitReplace(state.history, state.look, action.look),
@@ -150,7 +154,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       };
     case "edit-received": {
       if (state.look === null) {
-        return { ...state, pending: false };
+        return { ...state, pending: false, pendingCall: null };
       }
       const step = commitEdit(state.history, state.look, action.command);
       const look = step === null ? state.look : (step.look ?? state.look);
@@ -158,6 +162,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return {
         ...state,
         pending: false,
+        pendingCall: null,
         look,
         history: step === null ? state.history : step.history,
         nextId: id + 2,
@@ -191,11 +196,13 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       return stepTo(state, undoStep(state.history, state.look), action.at, "Undo");
     case "redo":
       return stepTo(state, redoStep(state.history, state.look), action.at, "Redo");
-    case "failed":
+    case "failed": {
+      const settled = { ...state, pending: false, pendingCall: null, streaming: "" };
+      if (action.error === "aborted") {
+        return { ...settled, nextId: id + 1, messages: [...state.messages, { id, from: "system", at: action.at, text: action.message }] };
+      }
       return {
-        ...state,
-        pending: false,
-        streaming: "",
+        ...settled,
         nextId: id + 2,
         messages: [...state.messages, { id, from: "system", at: action.at, text: action.message }],
         monitor: pushMonitor(state.monitor, {
@@ -210,6 +217,7 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
           error: action.error,
         }),
       };
+    }
   }
 }
 

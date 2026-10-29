@@ -157,7 +157,7 @@ describe("studio state", () => {
 
   it("records calls and failures in the monitor", () => {
     let state = initialStudioState("9:00");
-    state = studioReducer(state, { type: "sent", at: "9:00", text: "gold" });
+    state = studioReducer(state, { type: "sent", at: "9:00", call: "look", text: "gold" });
     expect(state.pending).toBe(true);
     state = studioReducer(state, { type: "look-received", at: "9:01", look, meta });
     state = studioReducer(state, { type: "edit-received", at: "9:02", command: { op: "toggle", targetId: "w1" }, meta });
@@ -167,6 +167,17 @@ describe("studio state", () => {
     expect(state.monitor.map((entry) => entry.call)).toEqual(["edit", "edit", "look"]);
     expect(new Set(state.messages.map((message) => message.id)).size).toBe(state.messages.length);
     expect(summarizeMonitor(state.monitor)).toEqual({ calls: 3, failures: 1, avgLatencyMs: 420, totalTokens: 60, live: true });
+  });
+
+  it("tracks the pending call and keeps cancels out of the monitor", () => {
+    let state = initialStudioState("9:00");
+    state = studioReducer(state, { type: "sent", at: "9:00", call: "look", text: "gold" });
+    expect(state.pendingCall).toBe("look");
+    state = studioReducer(state, { type: "failed", at: "9:01", call: "look", error: "aborted", message: "Request cancelled." });
+    expect(state.pendingCall).toBeNull();
+    expect(state.pending).toBe(false);
+    expect(state.monitor).toHaveLength(0);
+    expect(state.messages.at(-1)?.text).toBe("Request cancelled.");
   });
 
   it("caps the monitor and flags offline replies", () => {
