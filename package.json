@@ -11,11 +11,12 @@
     "dev": "concurrently -n web,server -c blue,green \"pnpm --filter @look-studio/web dev\" \"pnpm --filter @look-studio/server dev\"",
     "build": "pnpm -r build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p eval/tsconfig.json && pnpm -r typecheck",
     "e2e": "pnpm --filter @look-studio/web e2e",
-    "eval": "node eval/run.mjs"
+    "eval": "node eval/run.ts"
   },
   "devDependencies": {
+    "@types/node": "26.6.5",
     "concurrently": "10.0.6",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
