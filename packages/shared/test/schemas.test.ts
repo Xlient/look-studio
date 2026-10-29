@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   AnchorRegion,
+  AvatarImage,
+  AvatarJobStatus,
+  AvatarSpec,
   CritiqueReport,
   CritiqueReportJsonSchema,
   EditCommand,
@@ -126,5 +129,15 @@ describe("shared schemas", () => {
         false,
       );
     }
+  });
+});
+
+describe("avatar schemas", () => {
+  it("accepts only inline images and bounded job statuses", () => {
+    expect(AvatarImage.safeParse("data:image/webp;base64,UklGR=").success).toBe(true);
+    expect(AvatarImage.safeParse("https://example.com/me.png").success).toBe(false);
+    expect(AvatarJobStatus.safeParse({ jobId: "a", stage: "rigging", progress: 80 }).success).toBe(true);
+    expect(AvatarJobStatus.safeParse({ jobId: "a", stage: "rigging", progress: 101 }).success).toBe(false);
+    expect(AvatarSpec.safeParse({ id: "a", description: "x".repeat(501), conceptId: "c" }).success).toBe(false);
   });
 });

@@ -1,0 +1,222 @@
+import { AVATAR_CONCEPT_COUNT } from "@look-studio/shared";
+import type { AvatarConcept, AvatarJobStatus, JobQueue } from "@look-studio/shared";
+import { logInfo } from "./logger.ts";
+import type { AvatarBuild, AvatarModelProvider, BuildStage } from "./meshy-avatar.ts";
+import { MeshyError } from "./meshy-client.ts";
+import type { FetchFn } from "./model-client.ts";
+import type { ModerationCategory } from "./avatar-prompts.ts";
+import type { ModerationService } from "./moderation.ts";
+import type { ConceptService } from "./muse-image.ts";
+
+const CONCEPT_TTL_MS = 30 * 60_000;
+const MAX_CONCEPTS = 60;
+const JOB_TIMEOUT_MS = 20 * 60_000;
+const JOB_TTL_MS = 60 * 60_000;
+const MODELING_SHARE = 0.75;
+
+export class AvatarBlockedError extends Error {
+  readonly category: ModerationCategory;
+
+  constructor(category: ModerationCategory) {
+    super("avatar_blocked");
+    this.name = "AvatarBlockedError";
+    this.category = category;
+  }
+}
+
+export function overallProgress(stage: BuildStage, progress: number): number {
+  const clamped = Math.min(100, Math.max(0, progress)) / 100;
+  const share = stage === "modeling" ? clamped * MODELING_SHARE : MODELING_SHARE + clamped * (1 - MODELING_SHARE);
+  return Math.round(share * 99);
+}
+
+export function failureMessage(error: unknown): string {
+  if (error instanceof MeshyError) {
+    switch (error.kind) {
+      case "pose_failed":
+        return "Meshy couldn't find a humanoid pose to rig. Try a different concept.";
+      case "rejected":
+        return "Meshy couldn't build this character. Try a different concept.";
+      case "no_credits":
+        return "The 3D service is out of credits.";
+      case "rate_limited":
+        return "The 3D service is busy. Try again in a minute.";
+      default:
+        return "The 3D service is unavailable. Try again later.";
+    }
+  }
+  return "Something went wrong building the avatar.";
+}
+
+interface StoredConcept {
+  image: string;
+  description: string;
+  expiresAt: number;
+}
+
+interface AvatarJob {
+  createdAt: number;
+  status: AvatarJobStatus;
+  build: AvatarBuild | null;
+  listeners: Set<(status: AvatarJobStatus) => void>;
+}
+
+export interface AvatarStudioDeps {
+  readonly moderation: ModerationService;
+  readonly concepts: ConceptService;
+  readonly provider: AvatarModelProvider;
+  readonly queue: JobQueue;
+  readonly now: () => number;
+  readonly newId: () => string;
+  readonly onAvatarBuilt: () => void;
+  readonly fetch?: FetchFn;
+}
+
+export interface AvatarService {
+  createConcepts(description: string, photo: string | undefined, signal: AbortSignal): Promise<AvatarConcept[]>;
+  startJob(conceptId: string): string | null;
+  getJob(jobId: string): AvatarJobStatus | null;
+  subscribe(jobId: string, emit: (status: AvatarJobStatus) => Promise<void>, signal: AbortSignal): Promise<void>;
+  fetchModel(jobId: string, signal: AbortSignal): Promise<Response | null>;
+}
+
+const isTerminal = (status: AvatarJobStatus) => status.stage === "ready" || status.stage === "failed";
+
+export class AvatarStudio implements AvatarService {
+  private readonly deps: AvatarStudioDeps;
+  private readonly concepts = new Map<string, StoredConcept>();
+  private readonly jobs = new Map<string, AvatarJob>();
+
+  constructor(deps: AvatarStudioDeps) {
+    this.deps = deps;
+  }
+
+  private prune(): void {
+    const now = this.deps.now();
+    for (const [id, concept] of this.concepts) {
+      if (concept.expiresAt <= now) {
+        this.concepts.delete(id);
+      }
+    }
+    for (const [id, job] of this.jobs) {
+      if (job.createdAt + JOB_TTL_MS <= now && isTerminal(job.status)) {
+        this.jobs.delete(id);
+        void job.build?.cleanup(AbortSignal.timeout(10_000));
+      }
+    }
+    while (this.concepts.size > MAX_CONCEPTS) {
+      const oldest = this.concepts.keys().next().value;
+      if (oldest === undefined) {
+        return;
+      }
+      this.concepts.delete(oldest);
+    }
+  }
+
+  async createConcepts(description: string, photo: string | undefined, signal: AbortSignal): Promise<AvatarConcept[]> {
+    const verdict = await this.deps.moderation.check(description, signal);
+    if (!verdict.allowed) {
+      throw new AvatarBlockedError(verdict.category);
+    }
+    const images = await this.deps.concepts.createConcepts({ description, ...(photo === undefined ? {} : { photo }) }, signal);
+    this.prune();
+    const expiresAt = this.deps.now() + CONCEPT_TTL_MS;
+    return images.slice(0, AVATAR_CONCEPT_COUNT).map((image) => {
+      const id = `concept-${this.deps.newId()}`;
+      this.concepts.set(id, { image, description, expiresAt });
+      return { id, image };
+    });
+  }
+
+  private update(job: AvatarJob, status: AvatarJobStatus): void {
+    job.status = status;
+    for (const listener of job.listeners) {
+      listener(status);
+    }
+  }
+
+  startJob(conceptId: string): string | null {
+    this.prune();
+    const concept = this.concepts.get(conceptId);
+    if (concept === undefined) {
+      return null;
+    }
+    this.concepts.delete(conceptId);
+    const jobId = `avatar-${this.deps.newId()}`;
+    const job: AvatarJob = {
+      createdAt: this.deps.now(),
+      status: { jobId, stage: "queued", progress: 0 },
+      build: null,
+      listeners: new Set(),
+    };
+    this.jobs.set(jobId, job);
+    const queued = this.deps.queue.enqueue(
+      (signal) =>
+        this.deps.provider.build(concept.image, concept.description, signal, (stage, progress) =>
+          this.update(job, { jobId, stage, progress: overallProgress(stage, progress) }),
+        ),
+      { timeoutMs: JOB_TIMEOUT_MS },
+    );
+    queued.result.then(
+      (build) => {
+        job.build = build;
+        this.deps.onAvatarBuilt();
+        this.update(job, { jobId, stage: "ready", progress: 100 });
+      },
+      (error: unknown) => {
+        logInfo({ event: "avatar_job_failed", jobId, error: error instanceof MeshyError ? error.kind : "unknown" });
+        this.update(job, { jobId, stage: "failed", progress: job.status.progress, error: failureMessage(error) });
+      },
+    );
+    return jobId;
+  }
+
+  getJob(jobId: string): AvatarJobStatus | null {
+    return this.jobs.get(jobId)?.status ?? null;
+  }
+
+  async subscribe(jobId: string, emit: (status: AvatarJobStatus) => Promise<void>, signal: AbortSignal): Promise<void> {
+    const job = this.jobs.get(jobId);
+    if (job === undefined) {
+      return;
+    }
+    // A failed write means the client disconnected, which ends the subscription like an abort.
+    await new Promise<void>((resolve) => {
+      let writes = emit(job.status);
+      const done = () => {
+        job.listeners.delete(listener);
+        signal.removeEventListener("abort", done);
+        void writes.then(resolve, resolve);
+      };
+      const listener = (status: AvatarJobStatus) => {
+        writes = writes.then(() => emit(status));
+        if (isTerminal(status)) {
+          done();
+        }
+      };
+      if (isTerminal(job.status) || signal.aborted) {
+        void writes.then(resolve, resolve);
+        return;
+      }
+      job.listeners.add(listener);
+      signal.addEventListener("abort", done, { once: true });
+    });
+  }
+
+  async fetchModel(jobId: string, signal: AbortSignal): Promise<Response | null> {
+    const job = this.jobs.get(jobId);
+    const build = job?.build ?? null;
+    if (job === undefined || build === null) {
+      return null;
+    }
+    const response = await (this.deps.fetch ?? fetch)(build.glbUrl, { signal });
+    if (!response.ok || response.body === null) {
+      throw new MeshyError("unavailable", response.status);
+    }
+    const bytes = await response.arrayBuffer();
+    job.build = null;
+    this.jobs.delete(jobId);
+    await build.cleanup(AbortSignal.timeout(10_000));
+    return new Response(bytes, { headers: { "content-type": "model/gltf-binary", "cache-control": "no-store" } });
+  }
+}

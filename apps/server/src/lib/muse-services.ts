@@ -37,7 +37,7 @@ export interface MuseServiceDeps {
   readonly fetch?: FetchFn;
 }
 
-function acquire(limiter: RateLimiter, model: string): void {
+export function acquire(limiter: RateLimiter, model: string): void {
   const decision = limiter.tryAcquire(model, 1);
   if (!decision.allowed) {
     throw new ModelError("rate_limited", { model, retryAfterMs: decision.retryAfterMs });
