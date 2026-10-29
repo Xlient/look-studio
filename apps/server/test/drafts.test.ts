@@ -128,6 +128,7 @@ describe("look drafts", () => {
       "skinCoverage",
       "skinFinish",
     ]);
+    expect(buildLookPrompt("pink brows", false)).toContain("Only add wearables the user asks for");
   });
 
   it("exports a strict, shallow JSON schema", () => {

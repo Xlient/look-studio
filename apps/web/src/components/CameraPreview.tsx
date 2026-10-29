@@ -16,7 +16,7 @@ import { useLookScene } from "../scene/use-look-scene.ts";
 import { wearableLayout } from "../scene/wearable-layout.ts";
 import Window from "./Window.tsx";
 
-export default function CameraPreview({ look }: { look: LookSpec | null }) {
+export default function CameraPreview({ look, thinking }: { look: LookSpec | null; thinking: string | null }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
@@ -135,6 +135,11 @@ export default function CameraPreview({ look }: { look: LookSpec | null }) {
             <div className="player__idle">
               <span className="player__idle-logo" aria-hidden="true">◉</span>
               <span>NO SIGNAL</span>
+            </div>
+          )}
+          {thinking !== null && showing && (
+            <div className="player__thinking" aria-hidden="true">
+              <span className="player__thinking-spark">✦</span> {thinking}…
             </div>
           )}
           {look !== null && showing && !plain && (

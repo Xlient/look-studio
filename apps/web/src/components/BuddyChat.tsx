@@ -4,11 +4,12 @@ import type { LookSpec } from "@look-studio/shared";
 import { checkPhoto, photoProblemMessage, readPhoto } from "../studio/photo.ts";
 import { COMPOSE_TEXT_MAX, VIBE_DEFAULT } from "../studio/prompt-compose.ts";
 import type { LookContext, Occasion } from "../studio/prompt-compose.ts";
-import type { ChatMessage } from "../studio/studio-state.ts";
+import type { CallKind, ChatMessage } from "../studio/studio-state.ts";
 import type { OutgoingPhoto } from "../studio/use-studio.ts";
 import type { WearableJob } from "../studio/wearable-jobs.ts";
 import ConsentPrompt from "./ConsentPrompt.tsx";
 import JobList from "./JobList.tsx";
+import ThinkingBubble from "./ThinkingBubble.tsx";
 import VibeControls from "./VibeControls.tsx";
 import Window from "./Window.tsx";
 
@@ -23,6 +24,7 @@ const SCREEN_NAMES: Record<ChatMessage["from"], string> = {
 interface BuddyChatProps {
   messages: ChatMessage[];
   pending: boolean;
+  thinking: { call: CallKind; typicalMs: number | null } | null;
   streaming: string;
   hasLook: boolean;
   canUndo: boolean;
@@ -34,6 +36,7 @@ interface BuddyChatProps {
   onUndo: () => void;
   onRedo: () => void;
   onSave: (() => void) | null;
+  onCancel: () => void;
 }
 
 function LookCard({ look }: { look: LookSpec }) {
@@ -65,7 +68,8 @@ function LookCard({ look }: { look: LookSpec }) {
 }
 
 export default function BuddyChat(props: BuddyChatProps) {
-  const { messages, pending, streaming, hasLook, canUndo, canRedo, online, jobs, onSend, onReset, onUndo, onRedo, onSave } = props;
+  const { messages, pending, thinking, streaming, hasLook, canUndo, canRedo, online, jobs, onSend, onReset, onUndo, onRedo, onSave, onCancel } =
+    props;
   const [draft, setDraft] = useState("");
   const [photo, setPhoto] = useState<OutgoingPhoto | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -195,6 +199,7 @@ export default function BuddyChat(props: BuddyChatProps) {
           </li>
         )}
       </ol>
+      {thinking !== null && <ThinkingBubble call={thinking.call} typicalMs={thinking.typicalMs} onCancel={onCancel} />}
       <JobList jobs={jobs} />
       <div className="chips" role="group" aria-label="Suggestions">
         {SUGGESTIONS.map((suggestion) => (

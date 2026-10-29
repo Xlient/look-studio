@@ -125,6 +125,21 @@ test("the touch-up slider follows the look and works from the keyboard", async (
   await expect(slider).toHaveAttribute("aria-valuetext", "45%");
 });
 
+test("shows LookArtist working on the chat and camera, and cancels", async ({ page }) => {
+  await enterStudio(page);
+  await page.route("**/api/look/stream", () => undefined);
+  await page.getByRole("button", { name: /Start camera/ }).click();
+  await page.getByLabel("Message LookArtist").fill("Pink brows");
+  await page.getByRole("button", { name: /Send/ }).click();
+  await expect(page.getByRole("status").filter({ hasText: "LookArtist is designing your look" })).toBeVisible();
+  await expect(page.locator(".player__thinking")).toContainText("designing your look");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Request cancelled.");
+  await expect(page.locator(".thinking")).toHaveCount(0);
+  await expect(page.locator(".player__thinking")).toHaveCount(0);
+  await expect(page.getByLabel("Model call log")).not.toContainText("aborted");
+});
+
 test("sample video mode works without a camera", async ({ page }) => {
   await enterStudio(page);
   await page.evaluate(async () => {
