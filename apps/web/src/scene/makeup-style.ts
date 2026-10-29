@@ -1,7 +1,7 @@
 import type { Makeup } from "@look-studio/shared";
 
 export type MakeupRegion = "lips" | "gloss" | "blush" | "eyeshadow" | "brows";
-export type BlendOp = "multiply" | "soft-light" | "screen" | "color";
+export type BlendOp = "multiply" | "soft-light" | "screen" | "color" | "source-over";
 
 export interface MakeupPass {
   region: MakeupRegion;
@@ -12,6 +12,32 @@ export interface MakeupPass {
 }
 
 const SHIMMER = "#ffffff";
+const VIVID = { minLightness: 0.4, minSaturation: 0.5, pastelLightness: 0.75 } as const;
+const VIVID_COVER = 0.6;
+
+export function isVividTint(hex: string): boolean {
+  const value = Number.parseInt(hex.slice(1), 16);
+  if (hex.length !== 7 || !Number.isFinite(value)) {
+    return false;
+  }
+  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  const max = Math.max(...channels) / 255;
+  const min = Math.min(...channels) / 255;
+  const lightness = (max + min) / 2;
+  const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(2 * lightness - 1));
+  return lightness >= VIVID.minLightness && (saturation >= VIVID.minSaturation || lightness >= VIVID.pastelLightness);
+}
+
+// Multiply can only darken, so a light colour over dark hair or lids needs hue plus some coverage.
+function tintPasses(region: MakeupRegion, color: string, alpha: number, featherRatio: number): MakeupPass[] {
+  if (!isVividTint(color)) {
+    return [{ region, op: "multiply", color, alpha, featherRatio }];
+  }
+  return [
+    { region, op: "color", color, alpha, featherRatio },
+    { region, op: "source-over", color, alpha: alpha * VIVID_COVER, featherRatio },
+  ];
+}
 
 const LIP_FINISH = {
   matte: { op: "multiply", alphaScale: 1, featherRatio: 0.02 },
@@ -29,13 +55,13 @@ export function makeupPasses(makeup: Makeup | undefined): MakeupPass[] {
   }
   if (makeup.eyeshadow !== undefined) {
     const { color, opacity, finish } = makeup.eyeshadow;
-    passes.push({ region: "eyeshadow", op: "multiply", color, alpha: opacity, featherRatio: 0.06 });
+    passes.push(...tintPasses("eyeshadow", color, opacity, 0.06));
     if (finish === "shimmer") {
       passes.push({ region: "eyeshadow", op: "soft-light", color: SHIMMER, alpha: opacity * 0.5, featherRatio: 0.05 });
     }
   }
   if (makeup.brows !== undefined) {
-    passes.push({ region: "brows", op: "multiply", color: makeup.brows.color, alpha: makeup.brows.opacity, featherRatio: 0.02 });
+    passes.push(...tintPasses("brows", makeup.brows.color, makeup.brows.opacity, 0.02));
   }
   if (makeup.lips !== undefined) {
     const { color, opacity, finish } = makeup.lips;

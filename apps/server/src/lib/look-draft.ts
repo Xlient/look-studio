@@ -27,7 +27,7 @@ export const DraftMakeup = z.object({
 });
 export type DraftMakeup = z.infer<typeof DraftMakeup>;
 
-export const MAKEUP_OPACITY_CAP = { lips: 0.85, blush: 0.45, eyeshadow: 0.65, brows: 0.5 } as const;
+export const MAKEUP_OPACITY_CAP = { lips: 0.85, blush: 0.45, eyeshadow: 0.65, brows: 0.8 } as const;
 
 export const LookDraft = z.object({
   name: z.string(),
@@ -53,6 +53,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     `- wearables: at most ${MAX_DRAFT_WEARABLES} virtual 3D props, each anchored to a body region; scale 1 is natural size.`,
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
     "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
+    "- Bold colours are fine when asked, such as pink brows or blue lips; use the exact shade requested.",
     "- name: two to four catchy words. description: one or two sentences.",
     hasImage
       ? "A reference photo is attached. Use only its colours, accessories, and overall style."

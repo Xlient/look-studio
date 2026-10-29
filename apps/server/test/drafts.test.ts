@@ -32,7 +32,7 @@ const look: LookSpec = {
 };
 
 function edit(overrides: Partial<EditDraft>): EditDraft {
-  return { op: "toggle", targetId: "look-1-w1", color: null, delta: null, factor: null, wearable: null, ...overrides };
+  return { op: "toggle", targetId: "look-1-w1", color: null, delta: null, factor: null, opacity: null, wearable: null, ...overrides };
 }
 
 describe("look drafts", () => {
@@ -128,5 +128,43 @@ describe("edit drafts", () => {
     expect(draftToEditCommand(edit({ op: "move" }), look, "n")).toBeNull();
     expect(draftToEditCommand(edit({ op: "scale", factor: 0 }), look, "n")).toBeNull();
     expect(draftToEditCommand(edit({ op: "add", targetId: "new" }), look, "n")).toBeNull();
+  });
+
+  it("lists current makeup in the prompt", () => {
+    const prompt = buildEditPrompt("pink brows", { ...look, makeup: { brows: { color: "#4e342e", opacity: 0.4 } } });
+    expect(prompt).toContain("- brows: #4e342e at opacity 0.4");
+    expect(prompt).toContain("- lips: bare");
+  });
+
+  it("resolves makeup edits with the area caps", () => {
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "brows", color: "#ff69b4", opacity: 2 }), look, "n")).toEqual({
+      op: "makeup",
+      targetId: "brows",
+      color: "#ff69b4",
+      opacity: MAKEUP_OPACITY_CAP.brows,
+    });
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: " lips ", color: "#0000ff" }), look, "n")).toEqual({
+      op: "makeup",
+      targetId: "lips",
+      color: "#0000ff",
+      opacity: MAKEUP_OPACITY_CAP.lips * 0.75,
+    });
+    const withLips = { ...look, makeup: { lips: { color: "#aa0000", opacity: 0.6, finish: "matte" as const } } };
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "lips", color: "#0000ff" }), withLips, "n")).toEqual({
+      op: "makeup",
+      targetId: "lips",
+      color: "#0000ff",
+    });
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "blush", opacity: -1 }), look, "n")).toEqual({
+      op: "makeup",
+      targetId: "blush",
+      opacity: 0,
+    });
+  });
+
+  it("rejects makeup edits without an area or a change", () => {
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "hair", color: "#ff69b4" }), look, "n")).toBeNull();
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "brows", color: "pink" }), look, "n")).toBeNull();
+    expect(draftToEditCommand(edit({ op: "makeup", targetId: "brows", opacity: Number.NaN }), look, "n")).toBeNull();
   });
 });

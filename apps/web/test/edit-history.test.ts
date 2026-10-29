@@ -33,6 +33,7 @@ describe("edit history round trips", () => {
     ["move", { op: "move", targetId: "w1", delta: { x: 0.1, y: 0.3, z: 0 } }],
     ["scale", { op: "scale", targetId: "w1", factor: 1.5 }],
     ["recolor without a palette", { op: "recolor", targetId: "w1", color: "#FF0000" }],
+    ["makeup without makeup", { op: "makeup", targetId: "brows", color: "#FF69B4", opacity: 0.8 }],
   ];
 
   for (const [name, command] of commands) {
@@ -41,6 +42,12 @@ describe("edit history round trips", () => {
 
   it("restores a palette that existed", () => {
     roundTrip({ ...base, palette: ["#111111", "#FF0000"] }, { op: "recolor", targetId: "w1", color: "#FF0000" });
+  });
+
+  it("restores makeup that existed, including a removed area", () => {
+    const made = { ...base, makeup: { brows: { color: "#4E342E", opacity: 0.4 }, lips: { color: "#C2185B", opacity: 0.7, finish: "gloss" as const } } };
+    roundTrip(made, { op: "makeup", targetId: "brows", color: "#FF69B4" });
+    roundTrip(made, { op: "makeup", targetId: "lips", opacity: 0 });
   });
 
   it("puts a removed wearable back at its index", () => {

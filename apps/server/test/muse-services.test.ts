@@ -149,14 +149,14 @@ describe("MuseLookService", () => {
 
 describe("MuseEditService", () => {
   it("resolves an edit against the current look", async () => {
-    const reply = { op: "recolor", targetId: "look-1-w1", color: "#ff0000", delta: null, factor: null, wearable: null };
+    const reply = { op: "recolor", targetId: "look-1-w1", color: "#ff0000", delta: null, factor: null, opacity: null, wearable: null };
     const { deps } = makeDeps(recordingFetch(() => modelReply(reply), []));
     const result = await new MuseEditService(deps).edit({ utterance: "make it red", look }, signal);
     expect(result.data).toEqual({ op: "recolor", targetId: "look-1-w1", color: "#ff0000" });
   });
 
   it("throws EditUnresolvedError for an unknown target", async () => {
-    const reply = { op: "toggle", targetId: "ghost", color: null, delta: null, factor: null, wearable: null };
+    const reply = { op: "toggle", targetId: "ghost", color: null, delta: null, factor: null, opacity: null, wearable: null };
     const { deps } = makeDeps(recordingFetch(() => modelReply(reply), []));
     const error = await new MuseEditService(deps).edit({ utterance: "hide it", look }, signal).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(EditUnresolvedError);
@@ -194,7 +194,7 @@ describe("routes with Muse services", () => {
   });
 
   it("returns 422 when an edit cannot be resolved", async () => {
-    const reply = { op: "toggle", targetId: "ghost", color: null, delta: null, factor: null, wearable: null };
+    const reply = { op: "toggle", targetId: "ghost", color: null, delta: null, factor: null, opacity: null, wearable: null };
     const { deps } = makeDeps(recordingFetch(() => modelReply(reply), []));
     const app = createApp(createContainer({ editService: new MuseEditService(deps) }));
     const res = await post(app, "/api/edit", { utterance: "hide it", look });
