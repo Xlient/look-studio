@@ -122,10 +122,26 @@ describe("look edits", () => {
     expect(look.wearables).toHaveLength(1);
   });
 
+  it("applies makeup edits per area and keeps finishes", () => {
+    const pink = applyEdit(look, { op: "makeup", targetId: "brows", color: "#ff69b4", opacity: 0.8 });
+    expect(pink.makeup).toEqual({ brows: { color: "#ff69b4", opacity: 0.8 } });
+    const glossy = { ...look, makeup: { lips: { color: "#aa0000", opacity: 0.6, finish: "gloss" as const } } };
+    expect(applyEdit(glossy, { op: "makeup", targetId: "lips", color: "#0000ff" }).makeup?.lips).toEqual({
+      color: "#0000ff",
+      opacity: 0.6,
+      finish: "gloss",
+    });
+    expect(applyEdit(glossy, { op: "makeup", targetId: "lips", opacity: 0 })).not.toHaveProperty("makeup");
+    expect(applyEdit(look, { op: "makeup", targetId: "brows", color: "#ff69b4" })).toBe(look);
+    expect(applyEdit(look, { op: "makeup", targetId: "hair", color: "#ff69b4", opacity: 0.5 })).toBe(look);
+  });
+
   it("describes edits in plain words", () => {
     expect(describeEdit(look, { op: "move", targetId: "w1", delta: { x: 0, y: 0.2, z: 0 } })).toBe("Moved Crown up.");
     expect(describeEdit(look, { op: "toggle", targetId: "w1" })).toBe("Hid Crown.");
     expect(describeEdit(look, { op: "scale", targetId: "w1", factor: 0.5 })).toBe("Made Crown smaller.");
+    expect(describeEdit(look, { op: "makeup", targetId: "brows", color: "#FF69B4" })).toBe("Changed brows to #FF69B4.");
+    expect(describeEdit(look, { op: "makeup", targetId: "lips", opacity: 0 })).toBe("Took off the lips colour.");
   });
 });
 

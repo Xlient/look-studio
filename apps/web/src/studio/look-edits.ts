@@ -1,4 +1,5 @@
-import type { EditCommand, LookSpec, WearableSpec } from "@look-studio/shared";
+import { MakeupArea } from "@look-studio/shared";
+import type { EditCommand, LookSpec, Makeup, WearableSpec } from "@look-studio/shared";
 
 const MAX_WEARABLES = 20;
 export const MAX_OFFSET = 2;
@@ -10,6 +11,46 @@ function clampOffset(value: number): number {
 
 function updateWearable(look: LookSpec, id: string, update: (wearable: WearableSpec) => WearableSpec): LookSpec {
   return { ...look, wearables: look.wearables.map((wearable) => (wearable.id === id ? update(wearable) : wearable)) };
+}
+
+function withMakeup(look: LookSpec, makeup: Makeup): LookSpec {
+  if (Object.keys(makeup).length > 0) {
+    return { ...look, makeup };
+  }
+  const copy = { ...look };
+  delete copy.makeup;
+  return copy;
+}
+
+function applyMakeup(look: LookSpec, command: EditCommand): LookSpec {
+  const area = MakeupArea.safeParse(command.targetId);
+  if (!area.success) {
+    return look;
+  }
+  const makeup: Makeup = { ...look.makeup };
+  const current = makeup[area.data];
+  const color = command.color ?? current?.color;
+  const opacity = command.opacity ?? current?.opacity;
+  if (opacity === 0) {
+    delete makeup[area.data];
+    return withMakeup(look, makeup);
+  }
+  if (color === undefined || opacity === undefined) {
+    return look;
+  }
+  switch (area.data) {
+    case "lips":
+      makeup.lips = { color, opacity, finish: makeup.lips?.finish ?? "satin" };
+      break;
+    case "eyeshadow":
+      makeup.eyeshadow = { color, opacity, finish: makeup.eyeshadow?.finish ?? "matte" };
+      break;
+    case "blush":
+    case "brows":
+      makeup[area.data] = { color, opacity };
+      break;
+  }
+  return withMakeup(look, makeup);
 }
 
 export function applyEdit(look: LookSpec, command: EditCommand): LookSpec {
@@ -63,6 +104,8 @@ export function applyEdit(look: LookSpec, command: EditCommand): LookSpec {
       const palette = [color, ...(look.palette ?? []).filter((entry) => entry !== color)].slice(0, 8);
       return { ...look, palette };
     }
+    case "makeup":
+      return applyMakeup(look, command);
   }
 }
 
@@ -80,7 +123,19 @@ function describeMove(delta: { x: number; y: number; z: number }): string {
   return words.length === 0 ? "a touch" : words.join(" and ");
 }
 
+function describeMakeup(command: EditCommand): string {
+  if (command.opacity === 0) {
+    return `Took off the ${command.targetId} colour.`;
+  }
+  return command.color === undefined
+    ? `Adjusted the ${command.targetId}.`
+    : `Changed ${command.targetId} to ${command.color}.`;
+}
+
 export function describeEdit(before: LookSpec, command: EditCommand): string {
+  if (command.op === "makeup") {
+    return describeMakeup(command);
+  }
   const label = command.op === "add" ? command.wearable?.label ?? "a new item" : labelFor(before, command.targetId);
   switch (command.op) {
     case "add":

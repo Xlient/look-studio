@@ -1,4 +1,4 @@
-import type { EditCommand, LookSpec, WearableSpec } from "@look-studio/shared";
+import type { EditCommand, LookSpec, Makeup, WearableSpec } from "@look-studio/shared";
 import { applyEdit } from "./look-edits.ts";
 
 export const MAX_HISTORY = 30;
@@ -7,7 +7,8 @@ type Restore =
   | { kind: "remove-at"; index: number }
   | { kind: "insert-at"; index: number; wearable: WearableSpec }
   | { kind: "replace-at"; index: number; wearable: WearableSpec }
-  | { kind: "palette"; palette: string[] | undefined };
+  | { kind: "palette"; palette: string[] | undefined }
+  | { kind: "makeup"; makeup: Makeup | undefined };
 
 export type HistoryEntry =
   | { kind: "edit"; command: EditCommand; restore: Restore }
@@ -32,6 +33,9 @@ function push(entries: HistoryEntry[], entry: HistoryEntry): HistoryEntry[] {
 function captureRestore(look: LookSpec, command: EditCommand): Restore | null {
   if (command.op === "recolor") {
     return { kind: "palette", palette: look.palette };
+  }
+  if (command.op === "makeup") {
+    return { kind: "makeup", makeup: look.makeup };
   }
   if (command.op === "add") {
     return { kind: "remove-at", index: look.wearables.length };
@@ -59,6 +63,14 @@ function applyRestore(look: LookSpec, restore: Restore): LookSpec {
       }
       const copy = { ...look };
       delete copy.palette;
+      return copy;
+    }
+    case "makeup": {
+      if (restore.makeup !== undefined) {
+        return { ...look, makeup: restore.makeup };
+      }
+      const copy = { ...look };
+      delete copy.makeup;
       return copy;
     }
   }

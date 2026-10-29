@@ -1,5 +1,5 @@
 export { CritiqueIssue, CritiqueReport, CritiqueSeverity } from "./schemas/critique-report.ts";
-export { EditCommand, EditOp } from "./schemas/edit-command.ts";
+export { EditCommand, EditOp, MakeupArea } from "./schemas/edit-command.ts";
 export {
   CritiqueReportJsonSchema,
   EditCommandJsonSchema,

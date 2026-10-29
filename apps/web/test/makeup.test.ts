@@ -3,7 +3,7 @@ import type { Makeup } from "@look-studio/shared";
 import { createMakeupPainter } from "../src/scene/makeup-painter.ts";
 import type { PaintContext } from "../src/scene/makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "../src/scene/makeup-regions.ts";
-import { featherPx, makeupPasses } from "../src/scene/makeup-style.ts";
+import { featherPx, isVividTint, makeupPasses } from "../src/scene/makeup-style.ts";
 import { createHeadState } from "../src/tracking/head-state.ts";
 import type { HeadState } from "../src/tracking/head-state.ts";
 
@@ -102,6 +102,27 @@ describe("makeupPasses", () => {
     expect(op("matte")).toEqual(["multiply"]);
     expect(op("satin")).toEqual(["color"]);
     expect(op("gloss")).toEqual(["multiply", "screen"]);
+  });
+
+  it("treats saturated or pastel light colours as vivid", () => {
+    expect(["#ff69b4", "#00e5ff", "#e0e0e0", "#ffffff"].map(isVividTint)).toEqual([true, true, true, true]);
+    expect(["#4e342e", "#7e57c2", "#c8a08a", "#000000", "pink", "#ff69b"].map(isVividTint)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("covers dark brows with vivid colours instead of only darkening", () => {
+    const ops = (color: string) =>
+      makeupPasses({ brows: { color, opacity: 0.8 } }).map((pass) => `${pass.op}:${pass.alpha.toFixed(2)}`);
+    expect(ops("#4e342e")).toEqual(["multiply:0.80"]);
+    expect(ops("#ff69b4")).toEqual(["color:0.80", "source-over:0.48"]);
+    const shadow = makeupPasses({ eyeshadow: { color: "#00e5ff", opacity: 0.5, finish: "shimmer" } });
+    expect(shadow.map((pass) => pass.op)).toEqual(["color", "source-over", "soft-light"]);
   });
 
   it("scales feather with face size", () => {
