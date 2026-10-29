@@ -6,7 +6,7 @@ const LOOK = {
   name: "Coral Heart Flirt",
   style: "casual",
   palette: ["#FF6F61"],
-  makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" }, skin: { smoothing: 0.4 } },
+  makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" }, skin: { smoothing: 0.4, coverage: "light", finish: "dewy" } },
   wearables: [{ id: "look-e2e-w1", type: "hat", label: "Crown", anchor: { region: "head" }, visible: true }],
 };
 
@@ -116,6 +116,9 @@ test("the touch-up slider follows the look and works from the keyboard", async (
   await page.getByLabel("Message LookArtist").fill("Glam touch-up");
   await page.getByRole("button", { name: /Send/ }).click();
   await expect(slider).toHaveValue("40");
+  await expect(page.getByLabel("Coverage")).toHaveValue("light");
+  await page.getByLabel("Coverage").selectOption("full");
+  await expect(page.getByLabel("Coverage")).toHaveValue("full");
   await slider.focus();
   await page.keyboard.press("ArrowRight");
   await expect(slider).toHaveValue("45");

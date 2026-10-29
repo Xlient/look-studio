@@ -4,6 +4,7 @@ import { buildEditPrompt, draftToEditCommand } from "../src/lib/edit-draft.ts";
 import type { EditDraft } from "../src/lib/edit-draft.ts";
 import {
   buildLookPrompt,
+  DraftMakeup,
   clampScale,
   draftToLookSpec,
   LookDraftJsonSchema,
@@ -30,6 +31,8 @@ const draft: LookDraft = {
     browColor: "#4e342e",
     browOpacity: 0.4,
     skinSmoothing: 0,
+    skinCoverage: "none",
+    skinFinish: "natural",
   },
 };
 
@@ -66,11 +69,19 @@ describe("look drafts", () => {
   });
 
   it("caps skin smoothing and drops it at zero or when invalid", () => {
-    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0.4 })?.skin).toEqual({ smoothing: 0.4 });
-    expect(toMakeup({ ...draft.makeup, skinSmoothing: 3 })?.skin).toEqual({ smoothing: SKIN_SMOOTHING_CAP });
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0.4 })?.skin).toEqual({ smoothing: 0.4, coverage: "none", finish: "natural" });
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 3 })?.skin?.smoothing).toBe(SKIN_SMOOTHING_CAP);
     expect(toMakeup({ ...draft.makeup, skinSmoothing: 0 })?.skin).toBeUndefined();
     expect(toMakeup({ ...draft.makeup, skinSmoothing: -1 })?.skin).toBeUndefined();
     expect(toMakeup({ ...draft.makeup, skinSmoothing: Number.NaN })?.skin).toBeUndefined();
+  });
+
+  it("keeps coverage and finish even without smoothing", () => {
+    expect(toMakeup({ ...draft.makeup, skinCoverage: "light", skinFinish: "dewy", skinSmoothing: -2 })?.skin).toEqual({
+      smoothing: 0,
+      coverage: "light",
+      finish: "dewy",
+    });
   });
 
   it("omits makeup when every layer is bare", () => {
@@ -108,7 +119,15 @@ describe("look drafts", () => {
   it("builds a prompt with safety rules and the image hint", () => {
     expect(buildLookPrompt("gold crown", true)).toContain("reference photo is attached");
     expect(buildLookPrompt("gold crown", false)).toContain("Never describe, rate, or comment");
-    expect(buildLookPrompt("glam", false)).toContain("skinSmoothing: 0 to 1");
+    const prompt = buildLookPrompt("soft glam", true);
+    expect(prompt).toContain("Soft glam: light to medium");
+    expect(prompt).toContain("Never change or choose the person's skin tone");
+    expect(prompt).toContain("never the photo's skin itself");
+    expect(Object.keys(DraftMakeup.shape).filter((key) => key.startsWith("skin"))).toEqual([
+      "skinSmoothing",
+      "skinCoverage",
+      "skinFinish",
+    ]);
   });
 
   it("exports a strict, shallow JSON schema", () => {

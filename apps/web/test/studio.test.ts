@@ -78,6 +78,7 @@ describe("api client", () => {
     );
     expect(result).toEqual({ ok: false, error: "model_rate_limited", retryAfterS: 3 });
     expect(errorMessage("model_rate_limited", 3)).toContain("3s");
+    expect(errorMessage("skin_tone_change", null)).toContain("keeps your own skin tone");
   });
 
   it("reports network failures and timeouts", async () => {

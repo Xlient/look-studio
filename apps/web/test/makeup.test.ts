@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Makeup } from "@look-studio/shared";
 import { createMakeupPainter } from "../src/scene/makeup-painter.ts";
-import type { SkinSmoother } from "../src/scene/skin-smoother.ts";
+import { NO_SKIN } from "../src/scene/skin-smoother.ts";
+import type { SkinRender, SkinSmoother } from "../src/scene/skin-smoother.ts";
 import type { PaintContext } from "../src/scene/makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "../src/scene/makeup-regions.ts";
 import { featherPx, isVividTint, makeupPasses } from "../src/scene/makeup-style.ts";
@@ -153,16 +154,16 @@ describe("createMakeupPainter", () => {
     const { ctx, calls } = recordingContext();
     const strengths: number[] = [];
     const smoother = {
-      apply: (_target: unknown, _source: unknown, _geometry: unknown, strength: number) => {
-        calls.push(`smooth:${strength}`);
-        strengths.push(strength);
+      apply: (_target: unknown, _source: unknown, _geometry: unknown, skin: SkinRender) => {
+        calls.push(`smooth:${skin.smoothing}`);
+        strengths.push(skin.smoothing);
       },
     };
     const geometry = writeMakeupGeometry(createMakeupGeometry(), face(), 640, 480);
     const painter = createMakeupPainter(ctx, smoother as unknown as SkinSmoother);
-    painter.paint({} as CanvasImageSource, geometry, makeupPasses({ lips: FULL.lips }), 640, 480, 0.4);
+    painter.paint({} as CanvasImageSource, geometry, makeupPasses({ lips: FULL.lips }), 640, 480, { ...NO_SKIN, smoothing: 0.4 });
     expect(calls.slice(0, 2)).toEqual(["drawImage", "smooth:0.4"]);
-    painter.paint({} as CanvasImageSource, createMakeupGeometry(), [], 640, 480, 0.4);
+    painter.paint({} as CanvasImageSource, createMakeupGeometry(), [], 640, 480, { ...NO_SKIN, smoothing: 0.4 });
     expect(strengths).toEqual([0.4]);
   });
 

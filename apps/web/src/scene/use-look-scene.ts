@@ -10,16 +10,16 @@ import type { LookScene } from "./look-scene.ts";
 import { createMakeupPainter } from "./makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "./makeup-regions.ts";
 import { makeupPasses } from "./makeup-style.ts";
-import { createSkinSmoother } from "./skin-smoother.ts";
-import type { SmoothLayer } from "./skin-smoother.ts";
+import { NO_SKIN, createSkinSmoother } from "./skin-smoother.ts";
+import type { SkinRender, SmoothLayer } from "./skin-smoother.ts";
 import type { MakeupPass } from "./makeup-style.ts";
 
 const OUTPUT_FPS = 30;
 const NO_PASSES: MakeupPass[] = [];
 
-function createLayer(): SmoothLayer | null {
+function createLayer(readable: boolean): SmoothLayer | null {
   const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: readable });
   return ctx === null ? null : { canvas, ctx };
 }
 
@@ -36,15 +36,15 @@ export function useLookScene(
   makeup: Makeup | undefined,
   plain: boolean,
   wearables: WearableLayout,
-  touchUp: number,
+  skin: SkinRender,
 ) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
   const passesRef = useRef<MakeupPass[]>([]);
   const plainRef = useRef(plain);
   plainRef.current = plain;
-  const touchUpRef = useRef(touchUp);
-  touchUpRef.current = touchUp;
+  const skinRef = useRef(skin);
+  skinRef.current = skin;
   const wearablesRef = useRef(wearables);
 
   useEffect(() => {
@@ -95,8 +95,8 @@ export function useLookScene(
       const head = headRef.current;
       const plainFrame = plainRef.current;
       const passes = plainFrame ? NO_PASSES : passesRef.current;
-      const touch = plainFrame ? 0 : touchUpRef.current;
-      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passes, view.width, view.height, touch);
+      const skinFrame = plainFrame ? NO_SKIN : skinRef.current;
+      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passes, view.width, view.height, skinFrame);
       writeHeadAnchor(anchor, head, view);
       anchor.visible = anchor.visible && !plainRef.current;
       scene.render(anchor);

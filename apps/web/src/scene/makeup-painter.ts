@@ -1,7 +1,8 @@
 import type { MakeupGeometry, Polygon } from "./makeup-regions.ts";
 import { featherPx } from "./makeup-style.ts";
 import type { MakeupPass } from "./makeup-style.ts";
-import type { SkinSmoother } from "./skin-smoother.ts";
+import { NO_SKIN } from "./skin-smoother.ts";
+import type { SkinRender, SkinSmoother } from "./skin-smoother.ts";
 
 export type PaintContext = Pick<
   CanvasRenderingContext2D,
@@ -84,7 +85,7 @@ export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | 
       passes: readonly MakeupPass[],
       width: number,
       height: number,
-      touchUp = 0,
+      skin: SkinRender = NO_SKIN,
     ) {
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
@@ -93,7 +94,7 @@ export function createMakeupPainter(ctx: PaintContext, smoother: SkinSmoother | 
       if (!geometry.visible) {
         return;
       }
-      smoother?.apply(ctx, source, geometry, touchUp, width, height);
+      smoother?.apply(ctx, source, geometry, skin, width, height);
       for (const pass of passes) {
         ctx.save();
         ctx.globalCompositeOperation = pass.op;

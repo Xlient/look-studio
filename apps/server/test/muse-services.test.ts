@@ -38,6 +38,8 @@ const lookDraft = {
     browColor: "#4e342e",
     browOpacity: 0.4,
     skinSmoothing: 0,
+    skinCoverage: "none",
+    skinFinish: "natural",
   },
 };
 

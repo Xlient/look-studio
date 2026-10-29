@@ -46,6 +46,21 @@ describe("POST /api/look", () => {
   });
 });
 
+describe("skin tone requests", () => {
+  it("refuses to change skin tone on look, stream, and edit routes before any model call", async () => {
+    const app = createApp();
+    for (const [path, payload] of [
+      ["/api/look", { chat: "make me look Asian" }],
+      ["/api/look/stream", { chat: "darken my skin like the photo", image: "data:image/png;base64,AAA" }],
+      ["/api/edit", { utterance: "give me lighter skin", look }],
+    ] as const) {
+      const res = await post(app, path, payload);
+      expect(res.status).toBe(422);
+      expect(((await res.json()) as { error: string }).error).toBe("skin_tone_change");
+    }
+  });
+});
+
 describe("POST /api/edit", () => {
   it("returns an EditCommand for a valid look", async () => {
     const res = await post(createApp(), "/api/edit", { utterance: "hide the glasses", look });
