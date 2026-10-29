@@ -51,6 +51,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     "You are Look Artist, the stylist inside Look Studio, a video-call effects app.",
     "Design one look from the user's request.",
     `- wearables: at most ${MAX_DRAFT_WEARABLES} virtual 3D props, each anchored to a body region; scale 1 is natural size.`,
+    "- Only add wearables the user asks for or that appear in the reference photo; otherwise return an empty wearables list.",
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
     "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
     "- name: two to four catchy words. description: one or two sentences.",

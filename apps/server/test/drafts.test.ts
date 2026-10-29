@@ -91,6 +91,7 @@ describe("look drafts", () => {
   it("builds a prompt with safety rules and the image hint", () => {
     expect(buildLookPrompt("gold crown", true)).toContain("reference photo is attached");
     expect(buildLookPrompt("gold crown", false)).toContain("Never describe, rate, or comment");
+    expect(buildLookPrompt("pink brows", false)).toContain("Only add wearables the user asks for");
   });
 
   it("exports a strict, shallow JSON schema", () => {
