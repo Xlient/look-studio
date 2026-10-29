@@ -15,6 +15,12 @@ export type LipFinish = z.infer<typeof LipFinish>;
 export const ShadowFinish = z.enum(["matte", "shimmer"]);
 export type ShadowFinish = z.infer<typeof ShadowFinish>;
 
+export const SkinCoverage = z.enum(["none", "sheer", "light", "medium", "full"]);
+export type SkinCoverage = z.infer<typeof SkinCoverage>;
+
+export const SkinFinish = z.enum(["matte", "natural", "dewy"]);
+export type SkinFinish = z.infer<typeof SkinFinish>;
+
 const TintLayer = z.object({ color: HexColor, opacity: Opacity });
 
 export const Makeup = z.object({
@@ -22,6 +28,7 @@ export const Makeup = z.object({
   blush: TintLayer.optional(),
   eyeshadow: TintLayer.extend({ finish: ShadowFinish }).optional(),
   brows: TintLayer.optional(),
+  skin: z.object({ smoothing: Opacity, coverage: SkinCoverage.optional(), finish: SkinFinish.optional() }).optional(),
 });
 export type Makeup = z.infer<typeof Makeup>;
 

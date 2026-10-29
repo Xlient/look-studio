@@ -6,6 +6,7 @@ import { LookSpec } from "@look-studio/shared";
 import type { BudgetTracker } from "@look-studio/shared";
 import { invalidRequest, modelErrorBody, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { LookRequest, LookService } from "../lib/services.ts";
+import { asksToChangeSkinTone } from "../lib/skin-tone-guard.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
 
 const LookRequestBody = z.object({
@@ -23,6 +24,9 @@ async function parseLookRequest(c: Context): Promise<LookRequest | Response> {
   const parsed = LookRequestBody.safeParse(body.value);
   if (!parsed.success) {
     return invalidRequest(c, parsed.error);
+  }
+  if (asksToChangeSkinTone(parsed.data.chat)) {
+    return c.json({ ok: false, error: "skin_tone_change" }, 422);
   }
   return { chat: parsed.data.chat, image: parsed.data.image };
 }

@@ -471,6 +471,30 @@ body {
 }
 
 .player__deck,
+.player__touchup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.player__touchup label {
+  font-weight: bold;
+}
+
+.player__touchup input {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+  accent-color: var(--grape);
+}
+
+.player__touchup output {
+  min-width: 3em;
+  font-family: var(--mono);
+}
+
 .player__source {
   display: flex;
   flex-wrap: wrap;

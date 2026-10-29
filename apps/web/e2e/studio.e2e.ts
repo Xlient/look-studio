@@ -6,7 +6,7 @@ const LOOK = {
   name: "Coral Heart Flirt",
   style: "casual",
   palette: ["#FF6F61"],
-  makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" } },
+  makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" }, skin: { smoothing: 0.4, coverage: "light", finish: "dewy" } },
   wearables: [{ id: "look-e2e-w1", type: "hat", label: "Crown", anchor: { region: "head" }, visible: true }],
 };
 
@@ -107,6 +107,22 @@ test("a chat request logs the Muse call and shows the look", async ({ page }) =>
   await expect(page.getByRole("log", { name: "Conversation" })).toContainText(LOOK.name);
   await page.getByRole("button", { name: /Start camera/ }).click();
   await expect(page.locator(".player__ticker")).toContainText(`NOW WEARING: ${LOOK.name}`);
+});
+
+test("the touch-up slider follows the look and works from the keyboard", async ({ page }) => {
+  await enterStudio(page);
+  const slider = page.getByRole("slider", { name: /Touch-up/ });
+  await expect(slider).toHaveValue("0");
+  await page.getByLabel("Message LookArtist").fill("Glam touch-up");
+  await page.getByRole("button", { name: /Send/ }).click();
+  await expect(slider).toHaveValue("40");
+  await expect(page.getByLabel("Coverage")).toHaveValue("light");
+  await page.getByLabel("Coverage").selectOption("full");
+  await expect(page.getByLabel("Coverage")).toHaveValue("full");
+  await slider.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).toHaveValue("45");
+  await expect(slider).toHaveAttribute("aria-valuetext", "45%");
 });
 
 test("shows LookArtist working on the chat and camera, and cancels", async ({ page }) => {

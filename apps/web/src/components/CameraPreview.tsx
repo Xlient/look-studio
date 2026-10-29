@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SkinCoverage } from "@look-studio/shared";
 import type { LookSpec } from "@look-studio/shared";
 import {
   listVideoDevices,
@@ -20,6 +21,10 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
   const [plain, setPlain] = useState(false);
+  const [touchUp, setTouchUp] = useState(0);
+  const [coverage, setCoverage] = useState<SkinCoverage>("none");
+  const lookId = look?.id;
+  const lookSkin = look?.makeup?.skin;
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -40,6 +45,16 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
       return () => URL.revokeObjectURL(sampleUrl);
     }
   }, [sampleUrl]);
+
+  useEffect(() => {
+    if (lookSkin !== undefined) {
+      setTouchUp(Math.round(lookSkin.smoothing * 100));
+      setCoverage(lookSkin.coverage ?? "none");
+    }
+  }, [lookId, lookSkin]);
+
+  const finish = lookSkin?.finish ?? "natural";
+  const skin = useMemo(() => ({ smoothing: touchUp / 100, coverage, finish }), [touchUp, coverage, finish]);
 
   const refreshDevices = async () => {
     try {
@@ -100,7 +115,7 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
   const wearables = useMemo(() => wearableLayout(look), [look]);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables, skin);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -174,6 +189,28 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
               }}
             />
           </label>
+        </div>
+        <div className="player__touchup">
+          <label htmlFor="touch-up">✨ Touch-up</label>
+          <input
+            id="touch-up"
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={touchUp}
+            aria-valuetext={touchUp === 0 ? "off" : `${touchUp}%`}
+            onChange={(event) => setTouchUp(Number(event.target.value))}
+          />
+          <output htmlFor="touch-up">{touchUp === 0 ? "off" : `${touchUp}%`}</output>
+          <label htmlFor="coverage">Coverage</label>
+          <select id="coverage" value={coverage} onChange={(event) => setCoverage(SkinCoverage.parse(event.target.value))}>
+            {SkinCoverage.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="player__source">
           <label htmlFor="camera-device">Source</label>

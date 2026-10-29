@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { LookSpec } from "@look-studio/shared";
 import { buildEditPrompt, draftToEditCommand } from "../src/lib/edit-draft.ts";
 import type { EditDraft } from "../src/lib/edit-draft.ts";
-import { buildLookPrompt, clampScale, draftToLookSpec, LookDraftJsonSchema, MAKEUP_OPACITY_CAP, toMakeup } from "../src/lib/look-draft.ts";
+import {
+  buildLookPrompt,
+  DraftMakeup,
+  clampScale,
+  draftToLookSpec,
+  LookDraftJsonSchema,
+  MAKEUP_OPACITY_CAP,
+  SKIN_SMOOTHING_CAP,
+  toMakeup,
+} from "../src/lib/look-draft.ts";
 import type { LookDraft } from "../src/lib/look-draft.ts";
 
 const draft: LookDraft = {
@@ -21,6 +30,9 @@ const draft: LookDraft = {
     shadowFinish: "shimmer",
     browColor: "#4e342e",
     browOpacity: 0.4,
+    skinSmoothing: 0,
+    skinCoverage: "none",
+    skinFinish: "natural",
   },
 };
 
@@ -54,6 +66,22 @@ describe("look drafts", () => {
     expect(makeup?.blush).toBeUndefined();
     expect(makeup?.eyeshadow).toBeUndefined();
     expect(makeup?.brows).toBeUndefined();
+  });
+
+  it("caps skin smoothing and drops it at zero or when invalid", () => {
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0.4 })?.skin).toEqual({ smoothing: 0.4, coverage: "none", finish: "natural" });
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 3 })?.skin?.smoothing).toBe(SKIN_SMOOTHING_CAP);
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: 0 })?.skin).toBeUndefined();
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: -1 })?.skin).toBeUndefined();
+    expect(toMakeup({ ...draft.makeup, skinSmoothing: Number.NaN })?.skin).toBeUndefined();
+  });
+
+  it("keeps coverage and finish even without smoothing", () => {
+    expect(toMakeup({ ...draft.makeup, skinCoverage: "light", skinFinish: "dewy", skinSmoothing: -2 })?.skin).toEqual({
+      smoothing: 0,
+      coverage: "light",
+      finish: "dewy",
+    });
   });
 
   it("omits makeup when every layer is bare", () => {
@@ -91,6 +119,15 @@ describe("look drafts", () => {
   it("builds a prompt with safety rules and the image hint", () => {
     expect(buildLookPrompt("gold crown", true)).toContain("reference photo is attached");
     expect(buildLookPrompt("gold crown", false)).toContain("Never describe, rate, or comment");
+    const prompt = buildLookPrompt("soft glam", true);
+    expect(prompt).toContain("Soft glam: light to medium");
+    expect(prompt).toContain("Never change or choose the person's skin tone");
+    expect(prompt).toContain("never the photo's skin itself");
+    expect(Object.keys(DraftMakeup.shape).filter((key) => key.startsWith("skin"))).toEqual([
+      "skinSmoothing",
+      "skinCoverage",
+      "skinFinish",
+    ]);
     expect(buildLookPrompt("pink brows", false)).toContain("Only add wearables the user asks for");
   });
 

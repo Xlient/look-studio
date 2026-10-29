@@ -14,7 +14,7 @@ Look Studio is a web app that applies live makeup and generated 3D wearables to 
 4. **No new dependencies, no schema changes, no folder-structure changes** without asking first. Say what and why, then wait.
 5. **No telemetry, analytics, or network calls** except to the Meta Model API (and the 3D provider through its interface). Unit tests must not use the network.
 6. **Scope:** do exactly the task given. No extra features, no refactors, no "improvements" outside the files named in the task.
-7. **Privacy and safety:** never log or persist images; use only `muse-spark-1.3` and other Standard-mode models for anything containing a face (never `-contributor` variants); no skin analysis, smoothing, or blemish detection of any kind; wearable prompts go through the moderation function before any generation.
+7. **Privacy and safety:** never log or persist images; use only `muse-spark-1.3` and other Standard-mode models for anything containing a face (never `-contributor` variants); skin touch-up (smoothing) runs only in the browser on landmark masks, never sends skin or face images to a model for analysis, and the model never rates or comments on appearance; wearable prompts go through the moderation function before any generation.
 
 ## Engineering practices
 

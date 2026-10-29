@@ -1,5 +1,15 @@
 import { toJSONSchema, z } from "zod";
-import { AnchorRegion, HexColor, LipFinish, LookSpec, LookStyle, ShadowFinish, WearableType } from "@look-studio/shared";
+import {
+  AnchorRegion,
+  HexColor,
+  LipFinish,
+  LookSpec,
+  LookStyle,
+  ShadowFinish,
+  SkinCoverage,
+  SkinFinish,
+  WearableType,
+} from "@look-studio/shared";
 import type { Makeup, WearableSpec } from "@look-studio/shared";
 
 export const MAX_DRAFT_WEARABLES = 4;
@@ -24,10 +34,14 @@ export const DraftMakeup = z.object({
   shadowFinish: ShadowFinish,
   browColor: z.string(),
   browOpacity: z.number(),
+  skinSmoothing: z.number(),
+  skinCoverage: SkinCoverage,
+  skinFinish: SkinFinish,
 });
 export type DraftMakeup = z.infer<typeof DraftMakeup>;
 
 export const MAKEUP_OPACITY_CAP = { lips: 0.85, blush: 0.45, eyeshadow: 0.65, brows: 0.8 } as const;
+export const SKIN_SMOOTHING_CAP = 0.7;
 
 export const LookDraft = z.object({
   name: z.string(),
@@ -43,7 +57,14 @@ export const LookDraftJsonSchema = toJSONSchema(LookDraft) as unknown as Record<
 
 const SAFETY_RULES = [
   "Never describe, rate, or comment on the person's face, skin, body, age, or attractiveness.",
-  "Do not suggest skin smoothing, blemish removal, or any change to skin texture.",
+  "Never change or choose the person's skin tone, and never copy skin tone, ethnicity, or facial features from a photo; foundation is shade-matched to the user's own face on their device.",
+];
+
+const SKIN_GUIDE = [
+  "- skin: skinCoverage (none, sheer, light, medium, full), skinFinish (matte, natural, dewy), and skinSmoothing from 0 to 1, a soft-focus touch-up on the user's device.",
+  "- Match skin settings to the look's makeup intensity, from the request or the photo's makeup (never the photo's skin itself):",
+  "  no-makeup or clean look: sheer, natural, 0.15. Soft glam: light to medium, natural or dewy, 0.35, never cakey.",
+  "  Full glam, editorial, or airbrushed: full, matte, 0.55. Costume or bare looks: none, natural, 0.",
 ];
 
 export function buildLookPrompt(chat: string, hasImage: boolean): string {
@@ -54,6 +75,7 @@ export function buildLookPrompt(chat: string, hasImage: boolean): string {
     "- Only add wearables the user asks for or that appear in the reference photo; otherwise return an empty wearables list.",
     `- palette: at most ${MAX_PALETTE} colours as #RRGGBB for makeup and accents.`,
     "- makeup: lips, blush, eyeshadow and brows, each a #RRGGBB colour and opacity from 0 to 1; use opacity 0 to leave an area bare.",
+    ...SKIN_GUIDE,
     "- Bold colours are fine when asked, such as pink brows or blue lips; use the exact shade requested.",
     "- name: two to four catchy words. description: one or two sentences.",
     hasImage
@@ -100,11 +122,15 @@ export function toMakeup(draft: DraftMakeup): Makeup | undefined {
   const blush = tint(draft.blushColor, draft.blushOpacity, MAKEUP_OPACITY_CAP.blush);
   const eyeshadow = tint(draft.shadowColor, draft.shadowOpacity, MAKEUP_OPACITY_CAP.eyeshadow);
   const brows = tint(draft.browColor, draft.browOpacity, MAKEUP_OPACITY_CAP.brows);
+  const smoothing = Number.isFinite(draft.skinSmoothing) ? Math.min(SKIN_SMOOTHING_CAP, Math.max(0, draft.skinSmoothing)) : 0;
   const makeup: Makeup = {
     ...(lips === null ? {} : { lips: { ...lips, finish: draft.lipFinish } }),
     ...(blush === null ? {} : { blush }),
     ...(eyeshadow === null ? {} : { eyeshadow: { ...eyeshadow, finish: draft.shadowFinish } }),
     ...(brows === null ? {} : { brows }),
+    ...(smoothing > 0 || draft.skinCoverage !== "none"
+      ? { skin: { smoothing, coverage: draft.skinCoverage, finish: draft.skinFinish } }
+      : {}),
   };
   return Object.keys(makeup).length === 0 ? undefined : makeup;
 }

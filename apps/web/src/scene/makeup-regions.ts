@@ -9,6 +9,12 @@ const RIGHT_BROW_UPPER = [70, 63, 105, 66, 107];
 const RIGHT_BROW_LOWER = [46, 53, 52, 65, 55];
 const LEFT_BROW_UPPER = [300, 293, 334, 296, 336];
 const LEFT_BROW_LOWER = [276, 283, 282, 295, 285];
+const FACE_OVAL = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+  172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+];
+const RIGHT_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
+const LEFT_EYE = [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466];
 const RIGHT_CHEEK = 50;
 const LEFT_CHEEK = 280;
 const LOWER_LIP_CENTER = 17;
@@ -28,6 +34,9 @@ export interface MakeupGeometry {
   leftShadow: Polygon;
   rightBrow: Polygon;
   leftBrow: Polygon;
+  faceOval: Polygon;
+  rightEye: Polygon;
+  leftEye: Polygon;
   readonly cheeks: Float32Array;
   readonly glossCenter: Float32Array;
   eyeDistance: number;
@@ -44,6 +53,9 @@ export function createMakeupGeometry(): MakeupGeometry {
     leftShadow: polygon(LEFT_LID.length + LEFT_BROW_LOWER.length),
     rightBrow: polygon(RIGHT_BROW_UPPER.length + RIGHT_BROW_LOWER.length),
     leftBrow: polygon(LEFT_BROW_UPPER.length + LEFT_BROW_LOWER.length),
+    faceOval: polygon(FACE_OVAL.length),
+    rightEye: polygon(RIGHT_EYE.length),
+    leftEye: polygon(LEFT_EYE.length),
     cheeks: new Float32Array(4),
     glossCenter: new Float32Array(2),
     eyeDistance: 0,
@@ -98,6 +110,12 @@ export function writeMakeupGeometry(out: MakeupGeometry, state: HeadState | null
   writeShadow(out.leftShadow, state, LEFT_LID, LEFT_BROW_LOWER, width, height);
   writeBrow(out.rightBrow, state, RIGHT_BROW_UPPER, RIGHT_BROW_LOWER, width, height);
   writeBrow(out.leftBrow, state, LEFT_BROW_UPPER, LEFT_BROW_LOWER, width, height);
+  out.faceOval.count = 0;
+  writeLoop(out.faceOval, state, FACE_OVAL, width, height);
+  out.rightEye.count = 0;
+  writeLoop(out.rightEye, state, RIGHT_EYE, width, height);
+  out.leftEye.count = 0;
+  writeLoop(out.leftEye, state, LEFT_EYE, width, height);
   out.cheeks[0] = px(state, RIGHT_CHEEK, width);
   out.cheeks[1] = py(state, RIGHT_CHEEK, height);
   out.cheeks[2] = px(state, LEFT_CHEEK, width);

@@ -5,6 +5,7 @@ import { EditCommand, LookSpec } from "@look-studio/shared";
 import type { BudgetTracker } from "@look-studio/shared";
 import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { EditService } from "../lib/services.ts";
+import { asksToChangeSkinTone } from "../lib/skin-tone-guard.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
 
 const EditRequestBody = z.object({
@@ -22,6 +23,9 @@ async function handleEdit(c: Context, service: EditService): Promise<Response> {
   const parsed = EditRequestBody.safeParse(body.value);
   if (!parsed.success) {
     return invalidRequest(c, parsed.error);
+  }
+  if (asksToChangeSkinTone(parsed.data.utterance)) {
+    return c.json({ ok: false, error: "skin_tone_change" }, 422);
   }
   try {
     const result = await service.edit(

@@ -249,6 +249,8 @@ export function errorMessage(error: string, retryAfterS: number | null): string 
       return "Muse Spark took too long to answer. Try again.";
     case "invalid_request":
       return "That message couldn't be sent. Keep it under 2,000 characters.";
+    case "skin_tone_change":
+      return "Look Studio always keeps your own skin tone, so I can't change skin colour. Try a makeup or style idea instead.";
     case "body_too_large":
       return "That photo is too large. Try one under 3 MB.";
     case "aborted":
