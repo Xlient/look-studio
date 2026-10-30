@@ -1,6 +1,7 @@
 import { AVATAR_CONCEPT_COUNT } from "@look-studio/shared";
 import type { AvatarConcept, AvatarJobStatus, BudgetTracker, JobQueue } from "@look-studio/shared";
 import { logInfo } from "./logger.ts";
+import type { LogValue } from "./logger.ts";
 import type { AvatarBuild, AvatarModelProvider, BuildStage } from "./meshy-avatar.ts";
 import { MeshyError } from "./meshy-client.ts";
 import type { FetchFn } from "./model-client.ts";
@@ -133,11 +134,26 @@ export class AvatarStudio implements AvatarService {
   }
 
   async createConcepts(description: string, photo: string | undefined, client: AvatarClient, signal: AbortSignal): Promise<AvatarConcept[]> {
-    const verdict = await this.deps.moderation.check(description, signal, client.budget);
-    if (!verdict.allowed) {
-      throw new AvatarBlockedError(verdict.category);
+    const startedAt = this.deps.now();
+    const logConcepts = (outcome: string, moderationMs: number | null, count: number) =>
+      logInfo({ event: "avatar_concepts", durationMs: this.deps.now() - startedAt, moderationMs, count, outcome });
+    let moderationMs: number | null = null;
+    let images: string[];
+    try {
+      const verdict = await this.deps.moderation.check(description, signal, client.budget);
+      moderationMs = this.deps.now() - startedAt;
+      if (!verdict.allowed) {
+        logConcepts("blocked", moderationMs, 0);
+        throw new AvatarBlockedError(verdict.category);
+      }
+      images = await this.deps.concepts.createConcepts({ description, budget: client.budget, ...(photo === undefined ? {} : { photo }) }, signal);
+    } catch (error) {
+      if (!(error instanceof AvatarBlockedError)) {
+        logConcepts("error", moderationMs, 0);
+      }
+      throw error;
     }
-    const images = await this.deps.concepts.createConcepts({ description, budget: client.budget, ...(photo === undefined ? {} : { photo }) }, signal);
+    logConcepts("ok", moderationMs, images.length);
     this.prune();
     const expiresAt = this.deps.now() + CONCEPT_TTL_MS;
     return images.slice(0, AVATAR_CONCEPT_COUNT).map((image) => {
@@ -171,21 +187,29 @@ export class AvatarStudio implements AvatarService {
       listeners: new Set(),
     };
     this.jobs.set(jobId, job);
+    const totalMs = () => this.deps.now() - job.createdAt;
     const queued = this.deps.queue.enqueue(
-      (signal) =>
-        this.deps.provider.build(concept.image, concept.description, signal, (stage, progress) =>
-          this.update(job, { jobId, stage, progress: overallProgress(stage, progress) }),
-        ),
+      (signal) => {
+        logInfo({ event: "avatar_job_started", jobId, queuedMs: totalMs() });
+        return this.deps.provider.build(
+          concept.image,
+          concept.description,
+          signal,
+          (stage, progress) => this.update(job, { jobId, stage, progress: overallProgress(stage, progress) }),
+          jobId,
+        );
+      },
       { timeoutMs: JOB_TIMEOUT_MS },
     );
     queued.result.then(
       (build) => {
         job.build = build;
+        logInfo({ event: "avatar_job_ready", jobId, totalMs: totalMs() });
         this.deps.onAvatarBuilt(client.budget);
         this.update(job, { jobId, stage: "ready", progress: 100 });
       },
       (error: unknown) => {
-        logInfo({ event: "avatar_job_failed", jobId, error: error instanceof MeshyError ? error.kind : "unknown" });
+        logInfo({ event: "avatar_job_failed", jobId, totalMs: totalMs(), error: error instanceof MeshyError ? error.kind : "unknown" });
         this.update(job, { jobId, stage: "failed", progress: job.status.progress, error: failureMessage(error) });
       },
     );
@@ -231,23 +255,35 @@ export class AvatarStudio implements AvatarService {
     if (job === undefined || job.owner !== owner) {
       return null;
     }
+    const logFetch = (first: boolean, fields: Record<string, LogValue>) =>
+      logInfo({ event: "avatar_model_fetch", jobId, first, ...fields });
     if (job.model !== null) {
+      logFetch(false, { status: "ok", bytes: job.model.bytes.byteLength });
       return modelResponse(job.model.bytes);
     }
     const build = job.build;
     if (build === null) {
       return null;
     }
-    const response = await (this.deps.fetch ?? fetch)(build.glbUrl, { signal });
-    if (!response.ok || response.body === null) {
-      throw new MeshyError("unavailable", response.status);
+    const fetchStartedAt = this.deps.now();
+    let bytes: ArrayBuffer;
+    try {
+      const response = await (this.deps.fetch ?? fetch)(build.glbUrl, { signal });
+      if (!response.ok || response.body === null) {
+        throw new MeshyError("unavailable", response.status);
+      }
+      bytes = await response.arrayBuffer();
+    } catch (error) {
+      logFetch(true, { status: "error", fetchMs: this.deps.now() - fetchStartedAt, error: error instanceof MeshyError ? error.kind : "unknown" });
+      throw error;
     }
-    const bytes = await response.arrayBuffer();
+    const cleanupStartedAt = this.deps.now();
     job.build = null;
     // Meshy's copy is deleted next, so a browser that loses this download can only retry from here.
     job.model = { bytes, expiresAt: this.deps.now() + MODEL_RETAIN_MS };
     this.prune();
     await build.cleanup(AbortSignal.timeout(10_000));
+    logFetch(true, { status: "ok", bytes: bytes.byteLength, fetchMs: cleanupStartedAt - fetchStartedAt, cleanupMs: this.deps.now() - cleanupStartedAt });
     return modelResponse(bytes);
   }
 }
