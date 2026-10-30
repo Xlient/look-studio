@@ -1,6 +1,7 @@
 import type { Context, Next } from "hono";
 import type { BudgetTracker } from "@look-studio/shared";
 import { envNumber } from "../env.ts";
+import { clientIp } from "./rate-limit.ts";
 
 export function utcDay(now = new Date()): string {
   return now.toISOString().slice(0, 10);
@@ -8,6 +9,10 @@ export function utcDay(now = new Date()): string {
 
 export function dailySpendCapUsd(): number {
   return envNumber("DAILY_SPEND_CAP_USD", 5);
+}
+
+export function clientDailySpendCapUsd(): number {
+  return envNumber("CLIENT_DAILY_SPEND_CAP_USD", 0.5);
 }
 
 export function pricePer1kTokensUsd(): number {
@@ -65,6 +70,61 @@ export class InMemoryBudgetTracker implements BudgetTracker {
   }
 }
 
+export type BudgetRefusal = "spend_cap_exceeded" | "client_budget_exceeded";
+
+export class ClientBudgets {
+  private readonly capUsd: () => number;
+  private readonly global: BudgetTracker;
+  private readonly today: () => string;
+  private readonly clients = new Map<string, InMemoryBudgetTracker>();
+  private day: string;
+
+  constructor(capUsd: () => number, global: BudgetTracker, today: () => string = () => utcDay()) {
+    this.capUsd = capUsd;
+    this.global = global;
+    this.today = today;
+    this.day = this.today();
+  }
+
+  refusalFor(client: string): BudgetRefusal | null {
+    if (this.global.isExceeded()) {
+      return "spend_cap_exceeded";
+    }
+    this.rollover();
+    return this.clients.get(client)?.isExceeded() === true ? "client_budget_exceeded" : null;
+  }
+
+  forClient(client: string): BudgetTracker {
+    return {
+      record: (costUsd) => {
+        this.global.record(costUsd);
+        return this.tracker(client).record(costUsd);
+      },
+      remaining: () => Math.min(this.global.remaining(), this.tracker(client).remaining()),
+      isExceeded: () => this.refusalFor(client) !== null,
+    };
+  }
+
+  private tracker(client: string): InMemoryBudgetTracker {
+    this.rollover();
+    const existing = this.clients.get(client);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const created = new InMemoryBudgetTracker(this.capUsd, this.today);
+    this.clients.set(client, created);
+    return created;
+  }
+
+  private rollover(): void {
+    const current = this.today();
+    if (this.day !== current) {
+      this.day = current;
+      this.clients.clear();
+    }
+  }
+}
+
 const ledger = new InMemoryBudgetTracker(() => dailySpendCapUsd());
 
 export const defaultBudgetTracker: BudgetTracker = ledger;
@@ -86,14 +146,14 @@ export function isSpendCapExceeded(): boolean {
 }
 
 export function createSpendCapMiddleware(
-  tracker: BudgetTracker,
+  budgets: ClientBudgets,
 ): (c: Context, next: Next) => Promise<Response | void> {
   return async (c, next) => {
-    if (tracker.isExceeded()) {
-      return c.json({ ok: false, error: "spend_cap_exceeded" }, 429);
+    const refusal = budgets.refusalFor(clientIp(c));
+    if (refusal !== null) {
+      return c.json({ ok: false, error: refusal }, 429);
     }
     return next();
   };
 }
 
-export const spendCap = createSpendCapMiddleware(defaultBudgetTracker);

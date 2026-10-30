@@ -85,21 +85,21 @@ function makeDeps(fetch: FetchFn, overrides: Partial<MuseServiceDeps> = {}) {
       () => 0,
     ),
     rateLimiter: { tryAcquire: () => ({ allowed: true, retryAfterMs: 0 }) },
-    budget,
     newId: () => "abc",
     fetch,
     ...overrides,
   };
-  return { deps, spent };
+  return { deps, spent, budget };
 }
 
 const signal = new AbortController().signal;
+const noBudget: BudgetTracker = { record: () => 0, remaining: () => 1, isExceeded: () => false };
 
 describe("MuseLookService", () => {
   it("calls Muse Spark and returns a validated look with call meta", async () => {
     const bodies: Record<string, unknown>[] = [];
-    const { deps, spent } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
-    const result = await new MuseLookService(deps).createLook({ chat: "golden crown" }, signal);
+    const { deps, spent, budget } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
+    const result = await new MuseLookService(deps).createLook({ chat: "golden crown", budget }, signal);
     expect(result.data.id).toBe("look-abc");
     expect(result.data.wearables[0].id).toBe("look-abc-w1");
     expect(result.meta).toMatchObject({ model: MUSE_SPARK_MODEL, requestId: "resp_9", attempts: 1 });
@@ -111,9 +111,9 @@ describe("MuseLookService", () => {
   it("asks for low reasoning effort unless LOOK_REASONING_EFFORT overrides it", async () => {
     const bodies: Record<string, unknown>[] = [];
     const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
-    await new MuseLookService(deps).createLook({ chat: "gold" }, signal);
+    await new MuseLookService(deps).createLook({ chat: "gold", budget: noBudget }, signal);
     process.env.LOOK_REASONING_EFFORT = "minimal";
-    await new MuseLookService(deps).createLook({ chat: "gold" }, signal);
+    await new MuseLookService(deps).createLook({ chat: "gold", budget: noBudget }, signal);
     expect(bodies.map((body) => body["reasoning"])).toEqual([{ effort: "low" }, { effort: "minimal" }]);
   });
 
@@ -121,20 +121,20 @@ describe("MuseLookService", () => {
     process.env.LOOK_REASONING_EFFORT = "turbo";
     const bodies: Record<string, unknown>[] = [];
     const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
-    await expect(new MuseLookService(deps).createLook({ chat: "gold" }, signal)).rejects.toThrow("LOOK_REASONING_EFFORT");
+    await expect(new MuseLookService(deps).createLook({ chat: "gold", budget: noBudget }, signal)).rejects.toThrow("LOOK_REASONING_EFFORT");
     expect(bodies).toHaveLength(0);
   });
 
   it("sends a reference photo as an image input", async () => {
     const bodies: Record<string, unknown>[] = [];
     const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies));
-    await new MuseLookService(deps).createLook({ chat: "match", image: "data:image/png;base64,AAA" }, signal);
+    await new MuseLookService(deps).createLook({ chat: "match", image: "data:image/png;base64,AAA", budget: noBudget }, signal);
     expect(JSON.stringify(bodies[0]["input"])).toContain("input_image");
   });
 
   it("rejects output that does not match the draft schema", async () => {
     const { deps } = makeDeps(recordingFetch(() => modelReply({ name: "x" }), []));
-    const error = await new MuseLookService(deps).createLook({ chat: "x" }, signal).catch((e: unknown) => e);
+    const error = await new MuseLookService(deps).createLook({ chat: "x", budget: noBudget }, signal).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ModelError);
     expect((error as ModelError).kind).toBe("invalid_response");
   });
@@ -143,7 +143,7 @@ describe("MuseLookService", () => {
     const bodies: Record<string, unknown>[] = [];
     const denied: RateLimiter = { tryAcquire: () => ({ allowed: false, retryAfterMs: 1500 }) };
     const { deps } = makeDeps(recordingFetch(() => modelReply(lookDraft), bodies), { rateLimiter: denied });
-    const error = await new MuseLookService(deps).createLook({ chat: "x" }, signal).catch((e: unknown) => e);
+    const error = await new MuseLookService(deps).createLook({ chat: "x", budget: noBudget }, signal).catch((e: unknown) => e);
     expect((error as ModelError).kind).toBe("rate_limited");
     expect((error as ModelError).retryAfterMs).toBe(1500);
     expect(bodies).toHaveLength(0);
@@ -154,14 +154,14 @@ describe("MuseEditService", () => {
   it("resolves an edit against the current look", async () => {
     const reply = { op: "recolor", targetId: "look-1-w1", color: "#ff0000", delta: null, factor: null, opacity: null, wearable: null };
     const { deps } = makeDeps(recordingFetch(() => modelReply(reply), []));
-    const result = await new MuseEditService(deps).edit({ utterance: "make it red", look }, signal);
+    const result = await new MuseEditService(deps).edit({ utterance: "make it red", look, budget: noBudget }, signal);
     expect(result.data).toEqual({ op: "recolor", targetId: "look-1-w1", color: "#ff0000" });
   });
 
   it("throws EditUnresolvedError for an unknown target", async () => {
     const reply = { op: "toggle", targetId: "ghost", color: null, delta: null, factor: null, opacity: null, wearable: null };
     const { deps } = makeDeps(recordingFetch(() => modelReply(reply), []));
-    const error = await new MuseEditService(deps).edit({ utterance: "hide it", look }, signal).catch((e: unknown) => e);
+    const error = await new MuseEditService(deps).edit({ utterance: "hide it", look, budget: noBudget }, signal).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(EditUnresolvedError);
   });
 });

@@ -15,12 +15,13 @@ import type {
   LookService,
   WearableService,
 } from "./lib/services.ts";
-import { defaultBudgetTracker } from "./lib/spend-cap.ts";
+import { ClientBudgets, clientDailySpendCapUsd, defaultBudgetTracker } from "./lib/spend-cap.ts";
 
 export interface Container {
   readonly rateLimiter: RateLimiter;
   readonly modelRateLimiter: RateLimiter;
   readonly budgetTracker: BudgetTracker;
+  readonly clientBudgets: ClientBudgets;
   readonly retryPolicy: RetryPolicy;
   readonly lookService: LookService;
   readonly editService: EditService;
@@ -32,10 +33,12 @@ export interface Container {
 const defaultModelRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 3000, windowMs: 60_000 }));
 
 export function createContainer(overrides: Partial<Container> = {}): Container {
+  const budgetTracker = overrides.budgetTracker ?? defaultBudgetTracker;
   return {
     rateLimiter: overrides.rateLimiter ?? defaultRateLimiter,
     modelRateLimiter: overrides.modelRateLimiter ?? defaultModelRateLimiter,
-    budgetTracker: overrides.budgetTracker ?? defaultBudgetTracker,
+    budgetTracker,
+    clientBudgets: overrides.clientBudgets ?? new ClientBudgets(clientDailySpendCapUsd, budgetTracker),
     retryPolicy: overrides.retryPolicy ?? defaultRetryPolicy,
     lookService: overrides.lookService ?? new FakeLookService(),
     editService: overrides.editService ?? new FakeEditService(),
@@ -51,7 +54,6 @@ export function createLiveContainer(overrides: Partial<Container> = {}): Contain
   const deps = {
     retryPolicy: base.retryPolicy,
     rateLimiter: base.modelRateLimiter,
-    budget: base.budgetTracker,
     newId: () => randomUUID(),
   };
   return {

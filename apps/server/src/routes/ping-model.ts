@@ -4,6 +4,7 @@ import { toJSONSchema, z } from "zod";
 import { container } from "../container.ts";
 import { callModelStructured } from "../lib/model-client.ts";
 import { ModelError } from "../lib/model-errors.ts";
+import { clientIp } from "../lib/rate-limit.ts";
 import { createSpendCapMiddleware, estimateCostUsd } from "../lib/spend-cap.ts";
 
 const PingResult = z.object({ pong: z.boolean() });
@@ -26,7 +27,7 @@ async function ping(c: Context): Promise<Response> {
       signal: c.req.raw.signal,
       retryPolicy: container.retryPolicy,
     });
-    const spendUsd = container.budgetTracker.record(estimateCostUsd(result.tokens.total));
+    const spendUsd = container.clientBudgets.forClient(clientIp(c)).record(estimateCostUsd(result.tokens.total));
     if (!PingResult.safeParse(result.data).success) {
       return c.json({ ok: false, error: "model_bad_response" }, 502);
     }
@@ -47,6 +48,6 @@ async function ping(c: Context): Promise<Response> {
 }
 
 export const pingModelRoutes = new Hono()
-  .use("/api/ping-model", createSpendCapMiddleware(container.budgetTracker))
+  .use("/api/ping-model", createSpendCapMiddleware(container.clientBudgets))
   .get("/api/ping-model", ping)
   .post("/api/ping-model", ping);

@@ -2,18 +2,19 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
 import { EditCommand, LookSpec } from "@look-studio/shared";
-import type { BudgetTracker } from "@look-studio/shared";
+import { clientIp } from "../lib/rate-limit.ts";
 import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { EditService } from "../lib/services.ts";
 import { asksToChangeSkinTone } from "../lib/skin-tone-guard.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
+import type { ClientBudgets } from "../lib/spend-cap.ts";
 
 const EditRequestBody = z.object({
   utterance: z.string().min(1).max(2000),
   look: LookSpec,
 });
 
-async function handleEdit(c: Context, service: EditService): Promise<Response> {
+async function handleEdit(c: Context, service: EditService, budgets: ClientBudgets): Promise<Response> {
   const body = await readJsonBody(c);
   if (!body.ok) {
     return body.error === "body_too_large"
@@ -29,7 +30,7 @@ async function handleEdit(c: Context, service: EditService): Promise<Response> {
   }
   try {
     const result = await service.edit(
-      { utterance: parsed.data.utterance, look: parsed.data.look },
+      { utterance: parsed.data.utterance, look: parsed.data.look, budget: budgets.forClient(clientIp(c)) },
       c.req.raw.signal,
     );
     const checked = EditCommand.safeParse(result.data);
@@ -42,9 +43,9 @@ async function handleEdit(c: Context, service: EditService): Promise<Response> {
   }
 }
 
-export function createEditRoutes(service: EditService, budget: BudgetTracker): Hono {
+export function createEditRoutes(service: EditService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budget));
-  app.post("/api/edit", (c) => handleEdit(c, service));
+  app.use(createSpendCapMiddleware(budgets));
+  app.post("/api/edit", (c) => handleEdit(c, service, budgets));
   return app;
 }

@@ -108,6 +108,8 @@ Server settings (environment variables):
 | `MODEL_API_KEY` | required for live calls | Meta Model API key |
 | `PORT` | 3001 | API port |
 | `DAILY_SPEND_CAP_USD` | 5 | Estimated model spend per day before requests are refused |
+| `CLIENT_DAILY_SPEND_CAP_USD` | 0.5 | Estimated model spend per client IP per day |
+| `TRUSTED_PROXY_HOPS` | 0 | Proxies that append to `X-Forwarded-For`; at 0 the header is ignored |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | 60 / 60000 | Requests per IP per window |
 | `MODEL_TIMEOUT_MS` | 30000 | Per-call model timeout |
 | `MODEL_MAX_RETRIES` | 3 | Retries on HTTP 429, honoring `Retry-After` |

@@ -14,10 +14,10 @@ export function createApp(active: Container = container): Hono {
   app.use(createRateLimitMiddleware(active.rateLimiter));
   app.route("/", healthRoutes);
   app.route("/", pingModelRoutes);
-  app.route("/", createLookRoutes(active.lookService, active.budgetTracker));
-  app.route("/", createEditRoutes(active.editService, active.budgetTracker));
-  app.route("/", createFitCheckRoutes(active.fitCheckService, active.budgetTracker));
-  app.route("/", createWearableRoutes(active.wearableService, active.budgetTracker));
+  app.route("/", createLookRoutes(active.lookService, active.clientBudgets));
+  app.route("/", createEditRoutes(active.editService, active.clientBudgets));
+  app.route("/", createFitCheckRoutes(active.fitCheckService, active.clientBudgets));
+  app.route("/", createWearableRoutes(active.wearableService, active.clientBudgets));
   app.notFound((c) => c.json({ ok: false, error: "not_found" }, 404));
   return app;
 }

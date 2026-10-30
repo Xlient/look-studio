@@ -242,6 +242,8 @@ export function errorMessage(error: string, retryAfterS: number | null): string 
         : `Too many requests right now. Try again in ${Math.ceil(retryAfterS)}s.`;
     case "spend_cap_exceeded":
       return "Today's model budget is used up. Try again tomorrow.";
+    case "client_budget_exceeded":
+      return "You've used up your model budget for today. Try again tomorrow.";
     case "edit_unresolved":
       return "I couldn't tell which item you meant. Try naming it, like \"the crown\".";
     case "model_timeout":

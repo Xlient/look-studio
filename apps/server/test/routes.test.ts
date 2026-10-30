@@ -92,7 +92,7 @@ describe("POST /api/wearable", () => {
   it("creates a job and returns its id", async () => {
     const res = await post(createApp(), "/api/wearable", wearable);
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { jobId: string }).jobId).toMatch(/^job-fake-\d+$/);
+    expect(((await res.json()) as { jobId: string }).jobId).toMatch(/^job-fake-[0-9a-f-]{36}$/);
   });
 
   it("rejects an invalid spec", async () => {
@@ -139,6 +139,21 @@ describe("limits", () => {
     const limited = await post(app, "/api/look", { chat: "two" });
     expect(limited.status).toBe(429);
     expect(((await limited.json()) as { error: string }).error).toBe("rate_limited");
+  });
+
+  it("hides a job from a different client", async () => {
+    process.env.TRUSTED_PROXY_HOPS = "1";
+    const app = createApp();
+    const created = await app.request("/api/wearable", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.1" },
+      body: JSON.stringify(wearable),
+    });
+    const { jobId } = (await created.json()) as { jobId: string };
+    const watch = (ip: string) => app.request(`/api/wearable/${jobId}/events`, { headers: { "x-forwarded-for": ip } });
+    expect((await watch("203.0.113.2")).status).toBe(404);
+    expect((await watch("203.0.113.1")).status).toBe(200);
+    delete process.env.TRUSTED_PROXY_HOPS;
   });
 
   it("rejects new routes once the budget is exceeded", async () => {

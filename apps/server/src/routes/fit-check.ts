@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
 import { CritiqueReport } from "@look-studio/shared";
-import type { BudgetTracker } from "@look-studio/shared";
 import { invalidRequest, readJsonBody, serviceError } from "../lib/http.ts";
 import type { FitCheckService } from "../lib/services.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
+import type { ClientBudgets } from "../lib/spend-cap.ts";
 
 const FitCheckRequestBody = z.object({
   stills: z.array(z.string().min(1)).min(1).max(4),
@@ -36,9 +36,9 @@ async function handleFitCheck(c: Context, service: FitCheckService): Promise<Res
   }
 }
 
-export function createFitCheckRoutes(service: FitCheckService, budget: BudgetTracker): Hono {
+export function createFitCheckRoutes(service: FitCheckService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budget));
+  app.use(createSpendCapMiddleware(budgets));
   app.post("/api/fit-check", (c) => handleFitCheck(c, service));
   return app;
 }

@@ -1,4 +1,4 @@
-import type { BudgetTracker, EditCommand, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
+import type { EditCommand, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { EditDraft, EditDraftJsonSchema, buildEditPrompt, draftToEditCommand } from "./edit-draft.ts";
 import { LookDraft, LookDraftJsonSchema, buildLookPrompt, draftToLookSpec } from "./look-draft.ts";
 import { envString } from "../env.ts";
@@ -32,7 +32,6 @@ export function lookReasoningEffort(): ReasoningEffort {
 export interface MuseServiceDeps {
   readonly retryPolicy: RetryPolicy;
   readonly rateLimiter: RateLimiter;
-  readonly budget: BudgetTracker;
   readonly newId: () => string;
   readonly fetch?: FetchFn;
 }
@@ -82,7 +81,7 @@ export class MuseLookService implements LookService {
       request.image === undefined
         ? await callModelStructured<unknown>(options)
         : await callModelWithImage<unknown>({ ...options, images: [{ dataUrl: request.image }] });
-    this.deps.budget.record(estimateCostUsd(result.tokens.total));
+    request.budget.record(estimateCostUsd(result.tokens.total));
     const draft = LookDraft.safeParse(result.data);
     const look = draft.success ? draftToLookSpec(draft.data, `look-${this.deps.newId()}`) : null;
     if (look === null) {
@@ -110,7 +109,7 @@ export class MuseEditService implements EditService {
       retryPolicy: this.deps.retryPolicy,
       fetch: this.deps.fetch,
     });
-    this.deps.budget.record(estimateCostUsd(result.tokens.total));
+    request.budget.record(estimateCostUsd(result.tokens.total));
     const draft = EditDraft.safeParse(result.data);
     if (!draft.success) {
       throw new ModelError("invalid_response", { model: MUSE_SPARK_MODEL });
