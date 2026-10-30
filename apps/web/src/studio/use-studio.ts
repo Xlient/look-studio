@@ -52,7 +52,7 @@ export function useStudio(): {
       const result = await requestEdit({ utterance: text, look: current.look }, { signal: controller.signal });
       dispatch(
         result.ok
-          ? { type: "edit-received", at: clockTime(), command: result.data, meta: result.meta }
+          ? { type: "edit-received", at: clockTime(), edits: result.data, meta: result.meta }
           : { type: "failed", at: clockTime(), call, error: result.error, message: errorMessage(result.error, result.retryAfterS) },
       );
       return;

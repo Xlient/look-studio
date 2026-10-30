@@ -109,6 +109,34 @@ test("a chat request logs the Muse call and shows the look", async ({ page }) =>
   await expect(page.locator(".player__ticker")).toContainText(`NOW WEARING: ${LOOK.name}`);
 });
 
+test("one message can revise makeup and a wearable together, and undo takes it all back", async ({ page }) => {
+  await page.route("**/api/edit", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        meta: META,
+        edits: {
+          commands: [
+            { op: "makeup", targetId: "lips", color: "#C76B6B", opacity: 0.45 },
+            { op: "recolor", targetId: "look-e2e-w1", color: "#FFFFFF" },
+          ],
+          skipped: 0,
+        },
+      },
+    }),
+  );
+  await enterStudio(page);
+  await page.getByLabel("Message LookArtist").fill("Heart shades + coral lips");
+  await page.getByRole("button", { name: /Send/ }).click();
+  const log = page.getByRole("log", { name: "Conversation" });
+  await expect(log).toContainText(LOOK.name);
+  await page.getByLabel("Message LookArtist").fill("subtler lipstick and make the crown white");
+  await page.getByRole("button", { name: /Send/ }).click();
+  await expect(log).toContainText("Changed lips to #C76B6B. Switched Crown to #FFFFFF.");
+  await page.getByRole("button", { name: /Undo/ }).click();
+  await expect(page.getByRole("button", { name: /Redo/ })).toBeEnabled();
+});
+
 test("the touch-up slider follows the look and works from the keyboard", async ({ page }) => {
   await enterStudio(page);
   const slider = page.getByRole("slider", { name: /Touch-up/ });

@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { WearableSpec } from "./wearable-spec.ts";
+import { HexColor, WearableSpec } from "./wearable-spec.ts";
 
-export const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-export type HexColor = z.infer<typeof HexColor>;
+export { HexColor };
 
 export const LookStyle = z.enum(["casual", "formal", "street", "avant-garde", "sport"]);
 export type LookStyle = z.infer<typeof LookStyle>;
