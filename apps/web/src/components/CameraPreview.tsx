@@ -182,6 +182,11 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
           <button type="button" className="btn" aria-pressed={wobble} onClick={() => setWobble((value) => !value)}>
             〰 Wobble
           </button>
+          {avatarView !== null && avatar.status === "ready" && avatar.warning !== null && (
+            <p className="player__note" role="status">
+              {avatar.warning}
+            </p>
+          )}
           {avatarModel !== null && (
             <button
               type="button"

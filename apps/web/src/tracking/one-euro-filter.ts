@@ -10,6 +10,7 @@ export interface OneEuroParams {
 // Landmarks are normalized to the frame, so a fast head move is about 0.5 units per second.
 export const LANDMARK_FILTER: OneEuroParams = { minCutoffHz: 1, beta: 15, derivativeCutoffHz: 1, resetAfterMs: 500 };
 export const POSE_FILTER: OneEuroParams = { minCutoffHz: 1, beta: 5, derivativeCutoffHz: 1, resetAfterMs: 500 };
+export const EXPRESSION_FILTER: OneEuroParams = { minCutoffHz: 3, beta: 8, derivativeCutoffHz: 1, resetAfterMs: 500 };
 
 const smoothing = (cutoffHz: number, dtS: number) => 1 / (1 + 1 / (2 * Math.PI * cutoffHz * dtS));
 

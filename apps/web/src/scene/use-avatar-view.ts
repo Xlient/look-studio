@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { requestAvatarCheck } from "../studio/avatar-client.ts";
+import { setupAvatarFace } from "./avatar-face-setup.ts";
 import { loadAvatarView } from "./avatar-view.ts";
 import type { AvatarView } from "./avatar-view.ts";
 
-export type AvatarViewState = { status: "none" } | { status: "loading" } | { status: "ready"; view: AvatarView } | { status: "error" };
+export type AvatarViewState = { status: "none" } | { status: "loading" } | { status: "ready"; view: AvatarView; warning: string | null } | { status: "error" };
 
 export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
   const [state, setState] = useState<AvatarViewState>({ status: "none" });
@@ -14,6 +16,7 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
     }
     let cancelled = false;
     let loaded: AvatarView | null = null;
+    const controller = new AbortController();
     setState({ status: "loading" });
     loadAvatarView(model).then(
       (view) => {
@@ -22,7 +25,21 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
           return;
         }
         loaded = view;
-        setState({ status: "ready", view });
+        setState({ status: "ready", view, warning: null });
+        const check = (renders: { front: string; side: string }, signal: AbortSignal) =>
+          requestAvatarCheck(renders, { signal }).then((result) => (result.ok ? result.check : null));
+        setupAvatarFace(view, check, controller.signal).then(
+          (warning) => {
+            if (!cancelled) {
+              setState({ status: "ready", view, warning });
+            }
+          },
+          () => {
+            if (!cancelled) {
+              setState({ status: "ready", view, warning: "Facial expressions couldn't be set up for this avatar." });
+            }
+          },
+        );
       },
       () => {
         if (!cancelled) {
@@ -32,6 +49,7 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
     );
     return () => {
       cancelled = true;
+      controller.abort();
       loaded?.dispose();
     };
   }, [model]);

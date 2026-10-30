@@ -9,6 +9,8 @@ declare module "three" {
     z: number;
     constructor(x?: number, y?: number, z?: number);
     set(x: number, y: number, z: number): this;
+    applyMatrix4(m: Matrix4): this;
+    applyMatrix3(m: Matrix3): this;
   }
 
   export class Quaternion {
@@ -23,6 +25,13 @@ declare module "three" {
   export class Matrix4 {
     fromArray(array: ArrayLike<number>): this;
     extractRotation(m: Matrix4): this;
+    copy(m: Matrix4): this;
+    invert(): this;
+    multiply(m: Matrix4): this;
+  }
+
+  export class Matrix3 {
+    setFromMatrix4(m: Matrix4): this;
   }
 
   export class Euler {
@@ -51,7 +60,9 @@ declare module "three" {
     visible: boolean;
     renderOrder: number;
     frustumCulled: boolean;
+    readonly matrixWorld: Matrix4;
     add(...objects: Object3D[]): this;
+    attach(object: Object3D): this;
     lookAt(x: number, y: number, z: number): void;
     getWorldPosition(target: Vector3): Vector3;
     getWorldQuaternion(target: Quaternion): Quaternion;
@@ -65,11 +76,25 @@ declare module "three" {
   }
   export class Bone extends Object3D {}
 
+  export class BufferAttribute {
+    constructor(array: Float32Array, itemSize: number);
+    readonly count: number;
+    needsUpdate: boolean;
+    getX(index: number): number;
+    getY(index: number): number;
+    getZ(index: number): number;
+    getW(index: number): number;
+    setXYZ(index: number, x: number, y: number, z: number): this;
+  }
+
   export class BufferGeometry {
+    morphAttributes: { position?: BufferAttribute[] };
+    morphTargetsRelative: boolean;
+    getAttribute(name: string): BufferAttribute;
     dispose(): void;
   }
   export class PlaneGeometry extends BufferGeometry {
-    constructor(width?: number, height?: number);
+    constructor(width?: number, height?: number, widthSegments?: number, heightSegments?: number);
   }
   export class CylinderGeometry extends BufferGeometry {
     constructor(radiusTop?: number, radiusBottom?: number, height?: number, radialSegments?: number, heightSegments?: number, openEnded?: boolean);
@@ -109,9 +134,14 @@ declare module "three" {
     side?: number;
     depthTest?: boolean;
     depthWrite?: boolean;
+    transparent?: boolean;
+    polygonOffset?: boolean;
+    polygonOffsetFactor?: number;
+    polygonOffsetUnits?: number;
     emissive?: number;
   }
   export class Material {
+    needsUpdate: boolean;
     dispose(): void;
   }
   export class MeshBasicMaterial extends Material {
@@ -126,6 +156,19 @@ declare module "three" {
     constructor(geometry?: BufferGeometry, material?: Material);
     geometry: BufferGeometry;
     material: Material;
+    morphTargetInfluences?: number[];
+    updateMorphTargets(): void;
+  }
+
+  export class Skeleton {
+    readonly bones: Object3D[];
+    readonly boneInverses: Matrix4[];
+  }
+  export class SkinnedMesh extends Mesh {
+    readonly skeleton: Skeleton;
+    readonly bindMatrix: Matrix4;
+    readonly bindMatrixInverse: Matrix4;
+    getVertexPosition(index: number, target: Vector3): Vector3;
   }
 
   export class Light extends Object3D {}

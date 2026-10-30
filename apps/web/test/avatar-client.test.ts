@@ -7,6 +7,7 @@ import {
   downloadAvatarModel,
   getAvatarStatus,
   pollAvatarJob,
+  requestAvatarCheck,
   requestConcepts,
   startAvatar,
 } from "../src/studio/avatar-client.ts";
@@ -51,6 +52,22 @@ describe("requestConcepts", () => {
   it("passes through a moderation block", async () => {
     const { fetchFn } = fakeFetch([json({ ok: false, error: "avatar_blocked", category: "real_person" }, 422)]);
     expect(await requestConcepts({ description: "x" }, { signal, fetchFn })).toEqual({ ok: false, error: "avatar_blocked", retryAfterS: null });
+  });
+});
+
+describe("requestAvatarCheck", () => {
+  const renders = { front: IMAGE, side: IMAGE };
+  const check = { usable: true, issue: "", faceFound: true, leftEyeX: 0.4, leftEyeY: 0.5, rightEyeX: 0.6, rightEyeY: 0.5, mouthX: 0.5, mouthY: 0.8 };
+
+  it("returns a validated check", async () => {
+    const { fetchFn, calls } = fakeFetch([json({ ok: true, check })]);
+    expect(await requestAvatarCheck(renders, { signal, fetchFn })).toEqual({ ok: true, check });
+    expect(calls[0]?.url).toBe("/api/avatar/check");
+  });
+
+  it("rejects coordinates outside the render", async () => {
+    const { fetchFn } = fakeFetch([json({ ok: true, check: { ...check, mouthY: 4 } })]);
+    expect(await requestAvatarCheck(renders, { signal, fetchFn })).toMatchObject({ ok: false, error: "bad_response" });
   });
 });
 

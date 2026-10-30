@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { AVATAR_DESCRIPTION_MAX, AvatarImage } from "@look-studio/shared";
 import type { RateLimiter } from "@look-studio/shared";
+import type { AvatarCheckService } from "../lib/avatar-check.ts";
 import { AvatarBlockedError } from "../lib/avatar-studio.ts";
 import type { AvatarClient, AvatarService } from "../lib/avatar-studio.ts";
 import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
@@ -17,6 +18,8 @@ const ConceptsBody = z.object({
   description: z.string().trim().min(1).max(AVATAR_DESCRIPTION_MAX),
   photo: AvatarImage.optional(),
 });
+
+const CheckBody = z.object({ front: AvatarImage, side: AvatarImage });
 
 const StartBody = z.object({ conceptId: z.string().min(1).max(100) });
 
@@ -53,6 +56,30 @@ async function handleConcepts(c: Context, service: AvatarService, budgets: Clien
     }
     return modelErrorResponse(c, error);
   }
+}
+
+function handleCheck(service: AvatarCheckService, budgets: ClientBudgets, limiter: RateLimiter) {
+  return async (c: Context): Promise<Response> => {
+    const client = avatarClient(c, budgets);
+    // Only the global cap applies: one build can use up the per-IP budget, and its check still has to run.
+    if (budgets.refusalFor(client.key) === "spend_cap_exceeded") {
+      return c.json({ ok: false, error: "spend_cap_exceeded" }, 429);
+    }
+    const body = await parseBody(c, CheckBody);
+    if (body instanceof Response) {
+      return body;
+    }
+    const decision = limiter.tryAcquire(client.key, 1);
+    if (!decision.allowed) {
+      c.header("Retry-After", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1000))));
+      return c.json({ ok: false, error: "rate_limited" }, 429);
+    }
+    try {
+      return c.json({ ok: true, check: await service.check(body, client.budget, c.req.raw.signal) });
+    } catch (error) {
+      return modelErrorResponse(c, error);
+    }
+  };
 }
 
 function handleStart(service: AvatarService, budgets: ClientBudgets, dailyLimiter: RateLimiter) {
@@ -96,11 +123,17 @@ async function handleModel(c: Context, service: AvatarService): Promise<Response
   }
 }
 
-export function createAvatarRoutes(service: AvatarService, budgets: ClientBudgets, dailyLimiter: RateLimiter): Hono {
+export interface AvatarCheckRoute {
+  service: AvatarCheckService;
+  limiter: RateLimiter;
+}
+
+export function createAvatarRoutes(service: AvatarService, budgets: ClientBudgets, dailyLimiter: RateLimiter, check: AvatarCheckRoute): Hono {
   const app = new Hono();
   // Reads stay open past the cap: the build that crossed it is already paid for and must download.
   const spendCap = createSpendCapMiddleware(budgets);
   app.post("/api/avatar/concepts", spendCap, (c) => handleConcepts(c, service, budgets));
+  app.post("/api/avatar/check", handleCheck(check.service, budgets, check.limiter));
   app.post("/api/avatar", spendCap, handleStart(service, budgets, dailyLimiter));
   app.get("/api/avatar/:id", (c) => handleStatus(c, service));
   app.get("/api/avatar/:id/events", (c) => handleEvents(c, service));
