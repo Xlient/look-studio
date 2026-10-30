@@ -13,7 +13,13 @@ import ThinkingBubble from "./ThinkingBubble.tsx";
 import VibeControls from "./VibeControls.tsx";
 import Window from "./Window.tsx";
 
-const SUGGESTIONS = ["Golden crown + warm glow", "Heart shades + coral lips", "Flower crown + rosy blush"];
+const SUGGESTIONS = [
+  "Golden crown + warm glow",
+  "Heart shades + coral lips",
+  "Flower crown + rosy blush",
+  "Clean interview look",
+  "Weekend stubble",
+];
 
 const SCREEN_NAMES: Record<ChatMessage["from"], string> = {
   artist: "LookArtist",

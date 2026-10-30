@@ -32,6 +32,28 @@ export const Makeup = z.object({
 });
 export type Makeup = z.infer<typeof Makeup>;
 
+export const FacialHairStyle = z.enum(["none", "stubble", "mustache", "goatee", "boxed", "full"]);
+export type FacialHairStyle = z.infer<typeof FacialHairStyle>;
+
+export const BrowShape = z.enum(["natural", "tidy", "fuller"]);
+export type BrowShape = z.infer<typeof BrowShape>;
+
+export const FacialHair = z.object({
+  style: FacialHairStyle,
+  length: Opacity,
+  density: Opacity,
+  color: HexColor,
+  grey: Opacity,
+});
+export type FacialHair = z.infer<typeof FacialHair>;
+
+export const Grooming = z.object({
+  facialHair: FacialHair.optional(),
+  brows: BrowShape.optional(),
+  shadowCover: Opacity.optional(),
+});
+export type Grooming = z.infer<typeof Grooming>;
+
 export const LookSpec = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -39,6 +61,7 @@ export const LookSpec = z.object({
   wearables: z.array(WearableSpec).max(20),
   palette: z.array(HexColor).max(8).optional(),
   makeup: Makeup.optional(),
+  grooming: Grooming.optional(),
   style: LookStyle,
   createdAt: z.string().datetime().optional(),
 });

@@ -6,7 +6,20 @@ export {
   LookSpecJsonSchema,
   WearableSpecJsonSchema,
 } from "./json-schema.ts";
-export { HexColor, LipFinish, LookSpec, LookStyle, Makeup, ShadowFinish, SkinCoverage, SkinFinish } from "./schemas/look-spec.ts";
+export {
+  BrowShape,
+  FacialHair,
+  FacialHairStyle,
+  Grooming,
+  HexColor,
+  LipFinish,
+  LookSpec,
+  LookStyle,
+  Makeup,
+  ShadowFinish,
+  SkinCoverage,
+  SkinFinish,
+} from "./schemas/look-spec.ts";
 export {
   AnchorRegion,
   Offset3D,

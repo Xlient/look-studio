@@ -23,6 +23,10 @@ video file works too via **Sample video**).
   (sheer to full, with a dewy option) on the face skin, leaving eyes, brows,
   and lips sharp. The model picks levels from the request or the photo's
   makeup; the foundation shade is sampled from the user's own face.
+- **Grooming:** painted stubble, mustache, goatee, boxed and full beards with
+  length, density, colour, and salt-and-pepper grey; tidy or fuller brows; and
+  a subtle stubble cover in the user's own shade. Facial hair can be added,
+  not removed.
 - **Chat:** looks stream from `POST /api/look/stream` (server-sent events);
   edits go through `POST /api/edit`. Occasion chips, a subtle-to-bold vibe
   dial, a consent step before a reference photo is sent, undo and redo

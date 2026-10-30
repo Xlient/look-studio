@@ -12,14 +12,22 @@ const DEWY_GLOW = 0.14;
 const SAMPLE_EVERY_FRAMES = 30;
 const SAMPLE_SIZE = 24;
 const SAMPLE_MIN_ALPHA = 200;
+// Sampling only the upper face keeps beard shadow out of the foundation shade.
+const SAMPLE_UPPER_SHARE = 0.55;
+const COVER_MAX_MIX = 0.55;
 
 export interface SkinRender {
   smoothing: number;
   coverage: SkinCoverage;
   finish: SkinFinish;
+  cover: number;
 }
 
-export const NO_SKIN: SkinRender = { smoothing: 0, coverage: "none", finish: "natural" };
+export const NO_SKIN: SkinRender = { smoothing: 0, coverage: "none", finish: "natural", cover: 0 };
+
+export function coverAlpha(cover: number): number {
+  return Number.isFinite(cover) ? Math.min(1, Math.max(0, cover)) * COVER_MAX_MIX : 0;
+}
 
 export interface SmoothingSettings {
   alpha: number;
@@ -195,12 +203,35 @@ export function createSkinSmoother(createLayer: (readable: boolean) => SmoothLay
     }
     const s = LAYER_SCALE;
     ctx.globalCompositeOperation = "source-over";
+    const h = area.h * SAMPLE_UPPER_SHARE;
     ctx.clearRect(0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
-    ctx.drawImage(source, area.x, area.y, area.w, area.h, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
+    ctx.drawImage(source, area.x, area.y, area.w, h, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
     ctx.globalCompositeOperation = "destination-in";
-    ctx.drawImage(maskCanvas, area.x * s, area.y * s, area.w * s, area.h * s, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
+    ctx.drawImage(maskCanvas, area.x * s, area.y * s, area.w * s, h * s, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
     ctx.globalCompositeOperation = "source-over";
     return meanShade(ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data);
+  };
+
+  const drawCover = (ctx: CanvasRenderingContext2D, geometry: MakeupGeometry, color: string) => {
+    const feather = geometry.eyeDistance * FEATHER_RATIO;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.setTransform(LAYER_SCALE, 0, 0, LAYER_SCALE, 0, 0);
+    ctx.filter = blur(feather);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    trace(ctx, geometry.beard);
+    trace(ctx, geometry.mustache);
+    ctx.fill();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.filter = blur(feather / 4);
+    ctx.beginPath();
+    trace(ctx, geometry.lipsOuter);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "none";
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   };
 
   const mix = (target: SmoothTarget, layer: SmoothLayer, alpha: number, op: GlobalCompositeOperation, width: number, height: number) => {
@@ -221,7 +252,8 @@ export function createSkinSmoother(createLayer: (readable: boolean) => SmoothLay
       const smoothing = smoothingSettings(skin.smoothing, geometry.eyeDistance);
       const tint = coverageAlpha(skin.coverage);
       const glow = skin.finish === "dewy" ? DEWY_GLOW : 0;
-      if ((smoothing === null && tint === 0 && glow === 0) || mask === null || work === null) {
+      const cover = coverAlpha(skin.cover);
+      if ((smoothing === null && tint === 0 && glow === 0 && cover === 0) || mask === null || work === null) {
         return;
       }
       const area = writeFaceBounds(bounds, geometry.faceOval, geometry.eyeDistance * MARGIN_RATIO, width, height);
@@ -235,16 +267,20 @@ export function createSkinSmoother(createLayer: (readable: boolean) => SmoothLay
         drawBlurred(work.ctx, source, area, smoothing.blurPx, mask.canvas);
         mix(target, work, smoothing.alpha, "source-over", width, height);
       }
-      if (tint > 0 && sample !== null) {
+      if ((tint > 0 || cover > 0) && sample !== null) {
         framesSinceSample += 1;
         if (shade === null || framesSinceSample >= SAMPLE_EVERY_FRAMES) {
           shade = sampleShade(sample, source, area, mask.canvas) ?? shade;
           framesSinceSample = 0;
         }
-        if (shade !== null) {
-          fillMasked(work.ctx, shade, mask.canvas);
-          mix(target, work, tint, "source-over", width, height);
-        }
+      }
+      if (cover > 0 && shade !== null) {
+        drawCover(work.ctx, geometry, shade);
+        mix(target, work, cover, "source-over", width, height);
+      }
+      if (tint > 0 && shade !== null) {
+        fillMasked(work.ctx, shade, mask.canvas);
+        mix(target, work, tint, "source-over", width, height);
       }
       if (glow > 0) {
         fillMasked(work.ctx, "#ffffff", mask.canvas);
