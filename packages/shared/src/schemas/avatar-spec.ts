@@ -30,3 +30,19 @@ export const AvatarSpec = z.object({
   createdAt: z.string().datetime().optional(),
 });
 export type AvatarSpec = z.infer<typeof AvatarSpec>;
+
+const unitCoordinate = z.number().min(0).max(1);
+
+// Coordinates are 0-1 across the front render, x from the left and y from the top.
+export const AvatarCheck = z.object({
+  usable: z.boolean(),
+  issue: z.string().max(200),
+  faceFound: z.boolean(),
+  leftEyeX: unitCoordinate,
+  leftEyeY: unitCoordinate,
+  rightEyeX: unitCoordinate,
+  rightEyeY: unitCoordinate,
+  mouthX: unitCoordinate,
+  mouthY: unitCoordinate,
+});
+export type AvatarCheck = z.infer<typeof AvatarCheck>;

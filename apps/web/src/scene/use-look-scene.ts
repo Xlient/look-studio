@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { Grooming, Makeup } from "@look-studio/shared";
 import type { HeadState } from "../tracking/head-state.ts";
+import { EXPRESSION_COUNT, stepExpressions, toAvatarExpressions } from "../tracking/expressions.ts";
 import { createAvatarMotion, headAngles, stepAvatarMotion } from "./avatar-rig.ts";
 import type { AvatarView } from "./avatar-view.ts";
 import { MIN_CONFIDENCE, createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
@@ -101,6 +102,8 @@ export function useLookScene(
     const wobble = createWobble();
     const motion = createAvatarMotion();
     const angles = { yaw: 0, pitch: 0, roll: 0 };
+    const avatarFace = new Float32Array(EXPRESSION_COUNT);
+    const faceTarget = new Float32Array(EXPRESSION_COUNT);
     let lastMs = Number.NaN;
     let handle = 0;
 
@@ -121,8 +124,9 @@ export function useLookScene(
       if (avatarFrame !== null) {
         const tracked = head !== null && head.confidence >= MIN_CONFIDENCE;
         stepAvatarMotion(motion, tracked ? headAngles(angles, head.pose, view.mirror) : null, (tMs - lastMs) / 1000);
+        stepExpressions(avatarFace, tracked ? toAvatarExpressions(faceTarget, head.expressions, view.mirror) : null, (tMs - lastMs) / 1000);
         lastMs = tMs;
-        avatarFrame.pose(motion, tMs / 1000);
+        avatarFrame.pose(motion, avatarFace, tMs / 1000);
         scene.render(anchor, wobble);
         return;
       }

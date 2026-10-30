@@ -1144,3 +1144,9 @@ body {
     display: none;
   }
 }
+
+.player__note {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}

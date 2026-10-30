@@ -3,6 +3,7 @@ import type { Group, Material, Object3D } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createRigPose, findRigBones, writeRigPose } from "./avatar-rig.ts";
 import type { AvatarMotion, BoneTurn } from "./avatar-rig.ts";
+import type { FaceRig } from "./avatar-face-rig.ts";
 
 const BACKGROUND = 0xdfe7ff;
 const FOV_DEG = 30;
@@ -12,8 +13,11 @@ const HEAD_ROOM = 0.05;
 export interface AvatarView {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
+  readonly model: Object3D;
+  readonly head: Object3D | null;
+  setFaceRig(rig: FaceRig): void;
   resize(width: number, height: number): void;
-  pose(motion: AvatarMotion, timeS: number): void;
+  pose(motion: AvatarMotion, expressions: Float32Array, timeS: number): void;
   dispose(): void;
 }
 
@@ -83,6 +87,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
   frameBust(model, camera);
 
   const rig = createRigPose();
+  let faceRig: FaceRig | null = null;
   const euler = new Euler();
   const delta = new Quaternion();
   const parentWorld = new Quaternion();
@@ -107,11 +112,17 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
   return {
     scene,
     camera,
+    model,
+    head: head?.bone ?? null,
+    setFaceRig(next) {
+      faceRig = next;
+    },
     resize(width, height) {
       camera.aspect = height > 0 ? width / height : 1;
       camera.updateProjectionMatrix();
     },
-    pose(motion, timeS) {
+    pose(motion, expressions, timeS) {
+      faceRig?.apply(expressions);
       writeRigPose(rig, motion, timeS);
       if (head === null) {
         rig.neck.yaw += rig.head.yaw;

@@ -36,6 +36,7 @@ export type { RetryOptions, RetryPolicy } from "./ports/retry-policy.ts";
 export {
   AVATAR_CONCEPT_COUNT,
   AVATAR_DESCRIPTION_MAX,
+  AvatarCheck,
   AvatarConcept,
   AvatarImage,
   AvatarJobStatus,
