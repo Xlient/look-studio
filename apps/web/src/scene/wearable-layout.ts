@@ -66,7 +66,7 @@ export function wearableLayout(look: LookSpec | null): WearableLayout {
     head:
       hat === undefined || template === null
         ? null
-        : { ...slotFor(hat, hexColor(look.palette?.[0], DEFAULT_HEAD_COLOR)), template },
-    eyes: glasses === undefined ? null : slotFor(glasses, hexColor(look.palette?.[1], DEFAULT_GLASSES_COLOR)),
+        : { ...slotFor(hat, hexColor(hat.color ?? look.palette?.[0], DEFAULT_HEAD_COLOR)), template },
+    eyes: glasses === undefined ? null : slotFor(glasses, hexColor(glasses.color ?? look.palette?.[1], DEFAULT_GLASSES_COLOR)),
   };
 }

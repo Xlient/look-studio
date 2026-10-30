@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export type HexColor = z.infer<typeof HexColor>;
+
 export const AnchorRegion = z.enum([
   "head",
   "face",
@@ -46,5 +49,6 @@ export const WearableSpec = z.object({
   anchor: WearableAnchor,
   scale: z.number().positive().optional(),
   visible: z.boolean().optional(),
+  color: HexColor.optional(),
 });
 export type WearableSpec = z.infer<typeof WearableSpec>;
