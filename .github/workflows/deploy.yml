@@ -85,7 +85,7 @@ jobs:
             --allow-unauthenticated --max-instances 1 --min-instances 0 --cpu 1 --memory 512Mi --timeout 300 \
             --no-cpu-throttling \
             --set-secrets MODEL_API_KEY=model-api-key:latest,MESHY_API_KEY=meshy-api-key:latest \
-            --set-env-vars "DAILY_SPEND_CAP_USD=${{ vars.DAILY_SPEND_CAP_USD || '5' }},CLIENT_DAILY_SPEND_CAP_USD=${{ vars.CLIENT_DAILY_SPEND_CAP_USD || '0.5' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '0' }},RATE_LIMIT_MAX=${{ vars.RATE_LIMIT_MAX || '60' }},LOOK_REASONING_EFFORT=${{ vars.LOOK_REASONING_EFFORT || 'low' }}"
+            --set-env-vars "DAILY_SPEND_CAP_USD=${{ vars.DAILY_SPEND_CAP_USD || '5' }},CLIENT_DAILY_SPEND_CAP_USD=${{ vars.CLIENT_DAILY_SPEND_CAP_USD || '2' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '0' }},RATE_LIMIT_MAX=${{ vars.RATE_LIMIT_MAX || '60' }},LOOK_REASONING_EFFORT=${{ vars.LOOK_REASONING_EFFORT || 'low' }}"
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

@@ -12,7 +12,7 @@ export function dailySpendCapUsd(): number {
 }
 
 export function clientDailySpendCapUsd(): number {
-  return envNumber("CLIENT_DAILY_SPEND_CAP_USD", 0.5);
+  return envNumber("CLIENT_DAILY_SPEND_CAP_USD", 2);
 }
 
 export function pricePer1kTokensUsd(): number {
