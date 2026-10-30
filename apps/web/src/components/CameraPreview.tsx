@@ -22,6 +22,7 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
   const [mirror, setMirror] = useState(true);
   const [plain, setPlain] = useState(false);
   const skinSettings = useSkinSettings(look);
+  const [wobble, setWobble] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -102,7 +103,7 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
   const wearables = useMemo(() => wearableLayout(look), [look]);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, look?.grooming, plain, wearables, skinSettings.skin);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, look?.grooming, plain, wearables, skinSettings.skin, wobble);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -163,6 +164,9 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
           </button>
           <button type="button" className="btn" aria-pressed={plain} onClick={() => setPlain((value) => !value)}>
             ◌ Plain camera
+          </button>
+          <button type="button" className="btn" aria-pressed={wobble} onClick={() => setWobble((value) => !value)}>
+            〰 Wobble
           </button>
           <label className="btn btn--file">
             Sample video

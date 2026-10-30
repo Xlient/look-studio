@@ -14,6 +14,7 @@ import { createHairPatterns } from "./hair-texture.ts";
 import { NATURAL_SHAPE } from "./makeup-regions.ts";
 import { NO_SKIN, createSkinSmoother } from "./skin-smoother.ts";
 import type { SkinRender, SmoothLayer } from "./skin-smoother.ts";
+import { WOBBLE_PARAMS, createWobble, stepWobble } from "./wobble.ts";
 import type { MakeupPass } from "./makeup-style.ts";
 
 const OUTPUT_FPS = 30;
@@ -40,6 +41,7 @@ export function useLookScene(
   plain: boolean,
   wearables: WearableLayout,
   skin: SkinRender,
+  wobbleOn: boolean,
 ) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
@@ -49,6 +51,8 @@ export function useLookScene(
   plainRef.current = plain;
   const skinRef = useRef(skin);
   skinRef.current = skin;
+  const wobbleOnRef = useRef(wobbleOn);
+  wobbleOnRef.current = wobbleOn;
   const wearablesRef = useRef(wearables);
 
   useEffect(() => {
@@ -84,6 +88,8 @@ export function useLookScene(
     const anchor = createHeadAnchor();
     const gate = createFrameGate(OUTPUT_FPS);
     const view = viewRef.current;
+    const wobble = createWobble();
+    let lastMs = Number.NaN;
     let handle = 0;
 
     const frame = (tMs: number) => {
@@ -105,7 +111,11 @@ export function useLookScene(
       painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height, shapeRef.current), passes, view.width, view.height, skinFrame);
       writeHeadAnchor(anchor, head, view);
       anchor.visible = anchor.visible && !plainRef.current;
-      scene.render(anchor);
+      const headProp = wearablesRef.current.head;
+      const params = wobbleOnRef.current && headProp !== null ? WOBBLE_PARAMS[headProp.template] : null;
+      stepWobble(wobble, anchor, (tMs - lastMs) / 1000, params);
+      lastMs = tMs;
+      scene.render(anchor, wobble);
     };
     handle = requestAnimationFrame(frame);
 
