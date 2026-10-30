@@ -3,7 +3,8 @@ import type { FormEvent, KeyboardEvent } from "react";
 import type { LookSpec } from "@look-studio/shared";
 import { checkPhoto, photoProblemMessage, readPhoto } from "../studio/photo.ts";
 import { COMPOSE_TEXT_MAX, VIBE_DEFAULT } from "../studio/prompt-compose.ts";
-import type { LookContext, Occasion } from "../studio/prompt-compose.ts";
+import type { LookContext, Occasion, SkinChoice } from "../studio/prompt-compose.ts";
+import { loadSkinChoice, saveSkinChoice } from "../studio/skin-choice-store.ts";
 import type { CallKind, ChatMessage } from "../studio/studio-state.ts";
 import type { OutgoingPhoto } from "../studio/use-studio.ts";
 import type { WearableJob } from "../studio/wearable-jobs.ts";
@@ -81,6 +82,7 @@ export default function BuddyChat(props: BuddyChatProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [occasion, setOccasion] = useState<Occasion | null>(null);
   const [vibe, setVibe] = useState(VIBE_DEFAULT);
+  const [skin, setSkin] = useState<SkinChoice>(() => loadSkinChoice());
   const [consented, setConsented] = useState(false);
   const [asking, setAsking] = useState(false);
   const logRef = useRef<HTMLOListElement | null>(null);
@@ -97,6 +99,11 @@ export default function BuddyChat(props: BuddyChatProps) {
     } else {
       setAsking(true);
     }
+  };
+
+  const chooseSkin = (next: SkinChoice) => {
+    setSkin(next);
+    saveSkinChoice(next);
   };
 
   const closeConsent = (agreed: boolean) => {
@@ -116,7 +123,7 @@ export default function BuddyChat(props: BuddyChatProps) {
     setDraft("");
     setPhoto(null);
     setNotice(null);
-    await onSend(trimmed, photo, { occasion, vibe });
+    await onSend(trimmed, photo, { occasion, vibe, skin });
   };
 
   const attach = async (file: File | undefined) => {
@@ -214,7 +221,7 @@ export default function BuddyChat(props: BuddyChatProps) {
           </button>
         ))}
       </div>
-      <VibeControls occasion={occasion} vibe={vibe} disabled={pending} onOccasion={setOccasion} onVibe={setVibe} />
+      <VibeControls occasion={occasion} vibe={vibe} disabled={pending} onOccasion={setOccasion} onVibe={setVibe} skin={skin} onSkin={chooseSkin} />
       <form className="im-compose" onSubmit={onSubmit}>
         <label htmlFor="im-input" className="sr-only">
           Message LookArtist
