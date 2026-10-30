@@ -42,6 +42,8 @@ wearable generation, and SAM segmentation.
 | Service | Use |
 | --- | --- |
 | Meta Model API (`muse-spark-1.3`) | Look design and edit commands (structured output) |
+| Meta Model API (`muse-image-1.0`) | Avatar concept art |
+| Meshy API | Image-to-3D and rigging for avatars |
 | Google MediaPipe Face Landmarker model | Face landmarks and head pose, downloaded by the browser |
 | Firebase Hosting | Static web hosting and `/api` rewrite |
 | Google Cloud Run, Artifact Registry, Secret Manager | API hosting, container images, API key storage |

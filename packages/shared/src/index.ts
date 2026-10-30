@@ -33,3 +33,12 @@ export type { EnqueueOptions, Job, JobProgress, JobQueue } from "./ports/job-que
 export type { PoseFilter } from "./ports/pose-filter.ts";
 export type { RateLimitDecision, RateLimiter } from "./ports/rate-limiter.ts";
 export type { RetryOptions, RetryPolicy } from "./ports/retry-policy.ts";
+export {
+  AVATAR_CONCEPT_COUNT,
+  AVATAR_DESCRIPTION_MAX,
+  AvatarConcept,
+  AvatarImage,
+  AvatarJobStatus,
+  AvatarSpec,
+  AvatarStage,
+} from "./schemas/avatar-spec.ts";

@@ -1,6 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
-import { defaultRetryPolicy } from "./lib/model-client.ts";
+import { AvatarStudio } from "./lib/avatar-studio.ts";
+import type { AvatarService } from "./lib/avatar-studio.ts";
+import { FakeAvatarProvider, FakeConceptService } from "./lib/avatar-fakes.ts";
+import { InlineJobQueue } from "./lib/inline-job-queue.ts";
+import { createMeshyClient } from "./lib/meshy-client.ts";
+import { MeshyAvatarProvider, abortableSleep } from "./lib/meshy-avatar.ts";
+import { createModelClient, defaultRetryPolicy } from "./lib/model-client.ts";
+import { AllowAllModeration, MuseModeration } from "./lib/moderation.ts";
+import { MUSE_IMAGE_PRICE_USD, MuseImageConceptService } from "./lib/muse-image.ts";
+import { envNumber } from "./env.ts";
 import { MuseEditService, MuseLookService } from "./lib/muse-services.ts";
 import { InMemoryRateLimiter, defaultRateLimiter } from "./lib/rate-limit.ts";
 import {
@@ -15,7 +24,7 @@ import type {
   LookService,
   WearableService,
 } from "./lib/services.ts";
-import { defaultBudgetTracker } from "./lib/spend-cap.ts";
+import { defaultBudgetTracker, estimateCostUsd } from "./lib/spend-cap.ts";
 
 export interface Container {
   readonly rateLimiter: RateLimiter;
@@ -26,6 +35,33 @@ export interface Container {
   readonly editService: EditService;
   readonly fitCheckService: FitCheckService;
   readonly wearableService: WearableService;
+  readonly avatarService: AvatarService;
+  readonly avatarLimiter: RateLimiter;
+}
+
+// Rough USD per rigged avatar on the Meshy Pro plan; set MESHY_COST_USD to your real rate.
+export function meshyCostUsd(): number {
+  return envNumber("MESHY_COST_USD", 0.7);
+}
+
+const defaultAvatarLimiter: RateLimiter = new InMemoryRateLimiter(() => ({
+  max: envNumber("AVATAR_DAILY_LIMIT", 3),
+  windowMs: 24 * 60 * 60_000,
+}));
+
+// Muse Image allows 150 requests per minute.
+const imageRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 150, windowMs: 60_000 }));
+
+function fakeAvatarStudio(): AvatarService {
+  return new AvatarStudio({
+    moderation: new AllowAllModeration(),
+    concepts: new FakeConceptService(),
+    provider: new FakeAvatarProvider(),
+    queue: new InlineJobQueue(),
+    now: Date.now,
+    newId: () => randomUUID(),
+    onAvatarBuilt: () => {},
+  });
 }
 
 // Stand-in until the core token bucket lands; Muse Spark allows 3,000 requests per minute.
@@ -41,6 +77,8 @@ export function createContainer(overrides: Partial<Container> = {}): Container {
     editService: overrides.editService ?? new FakeEditService(),
     fitCheckService: overrides.fitCheckService ?? new FakeFitCheckService(),
     wearableService: overrides.wearableService ?? new FakeWearableService(),
+    avatarService: overrides.avatarService ?? fakeAvatarStudio(),
+    avatarLimiter: overrides.avatarLimiter ?? defaultAvatarLimiter,
   };
 }
 
@@ -58,7 +96,39 @@ export function createLiveContainer(overrides: Partial<Container> = {}): Contain
     ...base,
     lookService: overrides.lookService ?? new MuseLookService(deps),
     editService: overrides.editService ?? new MuseEditService(deps),
+    avatarService: overrides.avatarService ?? liveAvatarStudio(base),
   };
+}
+
+function liveAvatarStudio(base: Container): AvatarService {
+  const meshyKey = process.env.MESHY_API_KEY;
+  if (!meshyKey) {
+    return base.avatarService;
+  }
+  const budget = base.budgetTracker;
+  return new AvatarStudio({
+    moderation: new MuseModeration({
+      retryPolicy: base.retryPolicy,
+      rateLimiter: base.modelRateLimiter,
+      onTokens: (total) => budget.record(estimateCostUsd(total)),
+    }),
+    concepts: new MuseImageConceptService({
+      client: createModelClient(),
+      retryPolicy: base.retryPolicy,
+      rateLimiter: imageRateLimiter,
+      onImages: (count) => budget.record(count * MUSE_IMAGE_PRICE_USD),
+    }),
+    provider: new MeshyAvatarProvider({
+      client: createMeshyClient(meshyKey),
+      retryPolicy: base.retryPolicy,
+      sleep: abortableSleep,
+      now: Date.now,
+    }),
+    queue: new InlineJobQueue(),
+    now: Date.now,
+    newId: () => randomUUID(),
+    onAvatarBuilt: () => budget.record(meshyCostUsd()),
+  });
 }
 
 export function createRuntimeContainer(): Container {
