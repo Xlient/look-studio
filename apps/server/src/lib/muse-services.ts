@@ -1,5 +1,5 @@
-import type { EditCommand, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
-import { EditDraft, EditDraftJsonSchema, buildEditPrompt, draftToEditCommand } from "./edit-draft.ts";
+import type { EditBatch, LookSpec, RateLimiter, RetryPolicy } from "@look-studio/shared";
+import { EditBatchDraft, EditBatchDraftJsonSchema, buildEditPrompt, draftsToEditBatch } from "./edit-draft.ts";
 import { LookDraft, LookDraftJsonSchema, buildLookPrompt, draftToLookSpec } from "./look-draft.ts";
 import { envString } from "../env.ts";
 import { ReasoningEffort, callModelStructured, callModelWithImage } from "./model-client.ts";
@@ -36,7 +36,7 @@ export interface MuseServiceDeps {
   readonly fetch?: FetchFn;
 }
 
-function acquire(limiter: RateLimiter, model: string): void {
+export function acquire(limiter: RateLimiter, model: string): void {
   const decision = limiter.tryAcquire(model, 1);
   if (!decision.allowed) {
     throw new ModelError("rate_limited", { model, retryAfterMs: decision.retryAfterMs });
@@ -98,26 +98,26 @@ export class MuseEditService implements EditService {
     this.deps = deps;
   }
 
-  async edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditCommand>> {
+  async edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditBatch>> {
     acquire(this.deps.rateLimiter, MUSE_SPARK_MODEL);
     const result = await callModelStructured<unknown>({
       model: MUSE_SPARK_MODEL,
       prompt: buildEditPrompt(request.utterance, request.look),
-      schemaName: "edit_draft",
-      schema: EditDraftJsonSchema,
+      schemaName: "edit_batch",
+      schema: EditBatchDraftJsonSchema,
       signal,
       retryPolicy: this.deps.retryPolicy,
       fetch: this.deps.fetch,
     });
     request.budget.record(estimateCostUsd(result.tokens.total));
-    const draft = EditDraft.safeParse(result.data);
+    const draft = EditBatchDraft.safeParse(result.data);
     if (!draft.success) {
       throw new ModelError("invalid_response", { model: MUSE_SPARK_MODEL });
     }
-    const command = draftToEditCommand(draft.data, request.look, `${request.look.id}-w-${this.deps.newId()}`);
-    if (command === null) {
+    const batch = draftsToEditBatch(draft.data.edits, request.look, () => `${request.look.id}-w-${this.deps.newId()}`);
+    if (batch === null) {
       throw new EditUnresolvedError();
     }
-    return { data: command, meta: toMeta(result) };
+    return { data: batch, meta: toMeta(result) };
   }
 }

@@ -46,6 +46,14 @@ describe("wearableLayout", () => {
     expect(layout.eyes).toEqual({ id: "g", color: 0x00ffff, scale: 1, offset: { x: 0, y: 0, z: 0 } });
   });
 
+  it("prefers each wearable's own colour, so recolouring glasses leaves the hat alone", () => {
+    const layout = wearableLayout(
+      look([wearable({ id: "h", label: "Gold Crown" }), wearable({ id: "g", type: "glasses", label: "Specs", color: "#FFFFFF" })], ["#FF00FF", "#00FFFF"]),
+    );
+    expect(layout.eyes?.color).toBe(0xffffff);
+    expect(layout.head?.color).toBe(0xff00ff);
+  });
+
   it("falls back to default colours", () => {
     const layout = wearableLayout(look([wearable({ id: "h" }), wearable({ id: "g", type: "glasses", label: "Specs" })], ["#123456"]));
     expect(layout.head?.color).toBe(0x123456);

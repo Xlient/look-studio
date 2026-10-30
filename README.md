@@ -23,6 +23,10 @@ video file works too via **Sample video**).
   (sheer to full, with a dewy option) on the face skin, leaving eyes, brows,
   and lips sharp. The model picks levels from the request or the photo's
   makeup; the foundation shade is sampled from the user's own face.
+- **Grooming:** painted stubble, mustache, goatee, boxed and full beards with
+  length, density, colour, and salt-and-pepper grey; tidy or fuller brows; and
+  a subtle stubble cover in the user's own shade. Facial hair can be added,
+  not removed.
 - **Chat:** looks stream from `POST /api/look/stream` (server-sent events);
   edits go through `POST /api/edit`. Occasion chips, a subtle-to-bold vibe
   dial, a consent step before a reference photo is sent, undo and redo
@@ -85,8 +89,12 @@ queue, pose filter) and runs on simple in-memory implementations until the
 - Skin tone is never changed. The model has no skin-colour field, the
   foundation shade comes only from the user's camera, and requests to change
   skin tone or look like another race are refused before any model call.
-- The API key lives only on the server (`MODEL_API_KEY`). It is never in the
-  client bundle.
+- Avatar descriptions go through a Muse Spark moderation check before any image
+  is drawn. Meshy only ever receives a Muse-drawn concept the server itself
+  generated, never the user's photo or camera; concepts live in memory for 30
+  minutes and the Meshy tasks are deleted once the model is downloaded.
+- API keys live only on the server (`MODEL_API_KEY`, `MESHY_API_KEY`). They are
+  never in the client bundle.
 
 ## Run it locally
 
@@ -115,6 +123,10 @@ Server settings (environment variables):
 | `MODEL_MAX_RETRIES` | 3 | Retries on HTTP 429, honoring `Retry-After` |
 | `LOOK_REASONING_EFFORT` | low | `minimal`, `low`, `medium`, or `high` for look calls |
 | `BODY_MAX_BYTES` | 5000000 | Request body cap |
+| `MESHY_API_KEY` | unset | Meshy key; avatars use offline fakes without it (or without `MODEL_API_KEY`) |
+| `MESHY_COST_USD` | 0.7 | Estimated cost of one rigged avatar, counted against the spend cap |
+| `AVATAR_DAILY_LIMIT` | 3 | Avatars per IP per day |
+| `IMAGE_TIMEOUT_MS` / `MESHY_TIMEOUT_MS` | 120000 / 30000 | Per-call timeouts for Muse Image and Meshy |
 
 ## Scripts
 
@@ -150,7 +162,8 @@ keys are stored in the repository. Pull requests get a Hosting preview channel.
 
 ## Network policy
 
-The server calls only `https://api.meta.ai/v1`. The browser calls the Look
+The server calls `https://api.meta.ai/v1` and, for avatars, the Meshy API at
+`https://api.meshy.ai` (including downloading the finished model). The browser calls the Look
 Studio API and downloads the MediaPipe face model from Google storage; the
 MediaPipe WebAssembly files ship with the app. It sends no analytics or
 telemetry.

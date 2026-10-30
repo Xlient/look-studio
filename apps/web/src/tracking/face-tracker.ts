@@ -22,6 +22,7 @@ export interface FaceTrackerOptions<V extends VideoFrameSource> {
   onFrame: (state: HeadState, fps: number) => void;
   onError?: (error: unknown) => void;
   poseFilter?: PoseFilter<Float32Array>;
+  landmarkFilter?: PoseFilter<Float32Array>;
   scheduler?: FrameScheduler;
   now?: () => number;
 }
@@ -62,8 +63,13 @@ export function createFaceTracker<V extends VideoFrameSource>(options: FaceTrack
       options.onError?.(error);
       return;
     }
-    if (state.confidence > 0 && options.poseFilter !== undefined) {
-      state.pose.set(options.poseFilter.filter(state.pose, t));
+    if (state.confidence > 0) {
+      if (options.poseFilter !== undefined) {
+        state.pose.set(options.poseFilter.filter(state.pose, t));
+      }
+      if (options.landmarkFilter !== undefined) {
+        state.landmarks.set(options.landmarkFilter.filter(state.landmarks, t));
+      }
     }
     options.onFrame(state, fps.tick(t));
   };

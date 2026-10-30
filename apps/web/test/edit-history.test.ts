@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EditCommand, LookSpec, WearableSpec } from "@look-studio/shared";
-import { EMPTY_HISTORY, MAX_HISTORY, commitEdit, commitReplace, redoStep, undoStep } from "../src/studio/edit-history.ts";
+import { EMPTY_HISTORY, MAX_HISTORY, commitEdits, commitReplace, redoStep, undoStep } from "../src/studio/edit-history.ts";
 import type { EditHistory, HistoryStep } from "../src/studio/edit-history.ts";
 import { MAX_OFFSET, SCALE_RANGE } from "../src/studio/look-edits.ts";
 
@@ -10,7 +10,7 @@ const chain: WearableSpec = { id: "w3", type: "necklace", label: "Chain", anchor
 const base: LookSpec = { id: "look-1", name: "Gold", style: "formal", wearables: [crown, shades, chain] };
 
 function edit(look: LookSpec, command: EditCommand, history: EditHistory = EMPTY_HISTORY): HistoryStep {
-  const step = commitEdit(history, look, command);
+  const step = commitEdits(history, look, [command]);
   if (step === null || step.look === null) {
     throw new Error(`edit ${command.op} changed nothing`);
   }
@@ -32,7 +32,7 @@ describe("edit history round trips", () => {
     ["toggle", { op: "toggle", targetId: "w3" }],
     ["move", { op: "move", targetId: "w1", delta: { x: 0.1, y: 0.3, z: 0 } }],
     ["scale", { op: "scale", targetId: "w1", factor: 1.5 }],
-    ["recolor without a palette", { op: "recolor", targetId: "w1", color: "#FF0000" }],
+    ["recolor", { op: "recolor", targetId: "w1", color: "#FF0000" }],
     ["makeup without makeup", { op: "makeup", targetId: "brows", color: "#FF69B4", opacity: 0.8 }],
   ];
 
@@ -40,9 +40,6 @@ describe("edit history round trips", () => {
     it(`restores exactly after ${name}`, () => roundTrip(base, command));
   }
 
-  it("restores a palette that existed", () => {
-    roundTrip({ ...base, palette: ["#111111", "#FF0000"] }, { op: "recolor", targetId: "w1", color: "#FF0000" });
-  });
 
   it("restores makeup that existed, including a removed area", () => {
     const made = { ...base, makeup: { brows: { color: "#4E342E", opacity: 0.4 }, lips: { color: "#C2185B", opacity: 0.7, finish: "gloss" as const } } };
@@ -65,12 +62,12 @@ describe("edit history round trips", () => {
   });
 
   it("records nothing for edits that change nothing", () => {
-    expect(commitEdit(EMPTY_HISTORY, base, { op: "toggle", targetId: "missing" })).toBeNull();
-    expect(commitEdit(EMPTY_HISTORY, base, { op: "move", targetId: "w1" })).toBeNull();
+    expect(commitEdits(EMPTY_HISTORY, base, [{ op: "toggle", targetId: "missing" }])).toBeNull();
+    expect(commitEdits(EMPTY_HISTORY, base, [{ op: "move", targetId: "w1" }])).toBeNull();
     const full: LookSpec = { ...base, wearables: Array.from({ length: 20 }, (_v, i) => ({ ...crown, id: `f${i}` })) };
-    expect(commitEdit(EMPTY_HISTORY, full, { op: "add", targetId: "x", wearable: { ...crown, id: "x" } })).toBeNull();
+    expect(commitEdits(EMPTY_HISTORY, full, [{ op: "add", targetId: "x", wearable: { ...crown, id: "x" } }])).toBeNull();
     const atMax = edit(base, { op: "scale", targetId: "w2", factor: 10 });
-    expect(atMax.look === null ? null : commitEdit(atMax.history, atMax.look, { op: "scale", targetId: "w2", factor: 2 })).toBeNull();
+    expect(atMax.look === null ? null : commitEdits(atMax.history, atMax.look, [{ op: "scale", targetId: "w2", factor: 2 }])).toBeNull();
   });
 });
 
@@ -140,7 +137,7 @@ describe("edit history property", () => {
       let history: EditHistory = EMPTY_HISTORY;
       const forward: LookSpec[] = [];
       for (let i = 0; history.past.length < MAX_HISTORY && i < 200; i += 1) {
-        const step: HistoryStep | null = look === null ? null : commitEdit(history, look, randomCommand(look, random, i));
+        const step: HistoryStep | null = look === null ? null : commitEdits(history, look, [randomCommand(look, random, i)]);
         if (step !== null) {
           history = step.history;
           look = step.look;
@@ -168,7 +165,7 @@ describe("edit history property", () => {
     let history: EditHistory = { past: [], future: [] };
     let committed = 0;
     for (let i = 0; i < 200; i += 1) {
-      const step = commitEdit(history, current, randomCommand(current, random, i));
+      const step = commitEdits(history, current, [randomCommand(current, random, i)]);
       if (step === null || step.look === null) {
         continue;
       }
@@ -193,5 +190,42 @@ describe("edit history property", () => {
       history = step?.history ?? history;
       look = step?.look ?? null;
     }
+  });
+});
+
+describe("a batch of edits", () => {
+  const brows = { color: "#222222", opacity: 0.5 };
+  const look: LookSpec = { ...base, makeup: { brows, lips: { color: "#AA0000", opacity: 0.8, finish: "satin" } } };
+  const commands: EditCommand[] = [
+    { op: "makeup", targetId: "brows", color: "#555555" },
+    { op: "makeup", targetId: "lips", opacity: 0.5 },
+    { op: "recolor", targetId: "w2", color: "#FFFFFF" },
+  ];
+
+  it("applies every change, summarises each, and undoes as one step", () => {
+    const done = commitEdits(EMPTY_HISTORY, look, commands);
+    expect(done?.look.makeup?.brows?.color).toBe("#555555");
+    expect(done?.look.makeup?.lips?.opacity).toBe(0.5);
+    expect(done?.look.wearables[1]?.color).toBe("#FFFFFF");
+    expect(done?.summary).toHaveLength(3);
+    expect(done?.history.past).toHaveLength(1);
+    const undone = done === null ? null : undoStep(done.history, done.look);
+    expect(undone?.look).toEqual(look);
+    const redone = undone === null ? null : redoStep(undone.history, undone.look);
+    expect(redone?.look).toEqual(done?.look);
+  });
+
+  it("restores overlapping edits in reverse order", () => {
+    const done = commitEdits(EMPTY_HISTORY, base, [
+      { op: "recolor", targetId: "w1", color: "#111111" },
+      { op: "recolor", targetId: "w1", color: "#222222" },
+    ]);
+    expect(done?.look.wearables[0]?.color).toBe("#222222");
+    expect(done === null ? null : undoStep(done.history, done.look)?.look).toEqual(base);
+  });
+
+  it("keeps the changes that work and ignores the rest", () => {
+    const done = commitEdits(EMPTY_HISTORY, base, [{ op: "toggle", targetId: "missing" }, { op: "toggle", targetId: "w1" }]);
+    expect(done?.summary).toEqual(["Hid Crown."]);
   });
 });

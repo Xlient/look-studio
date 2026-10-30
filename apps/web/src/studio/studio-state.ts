@@ -1,8 +1,7 @@
-import type { EditCommand, LookSpec } from "@look-studio/shared";
+import type { EditBatch, LookSpec } from "@look-studio/shared";
 import type { CallMeta } from "./api-client.ts";
-import { EMPTY_HISTORY, commitEdit, commitReplace, redoStep, undoStep } from "./edit-history.ts";
+import { EMPTY_HISTORY, commitEdits, commitReplace, redoStep, undoStep } from "./edit-history.ts";
 import type { EditHistory, HistoryStep } from "./edit-history.ts";
-import { describeEdit } from "./look-edits.ts";
 
 export const MAX_MONITOR_ENTRIES = 50;
 export const OFFLINE_MODEL = "offline-fake";
@@ -47,7 +46,7 @@ export type StudioAction =
   | { type: "sent"; at: string; call: CallKind; text: string; attachment?: string; note?: string }
   | { type: "streamed"; text: string }
   | { type: "look-received"; at: string; look: LookSpec; meta: CallMeta }
-  | { type: "edit-received"; at: string; command: EditCommand; meta: CallMeta }
+  | { type: "edit-received"; at: string; edits: EditBatch; meta: CallMeta }
   | { type: "failed"; at: string; call: CallKind; error: string; message: string }
   | { type: "reset"; at: string }
   | { type: "look-loaded"; at: string; look: LookSpec; name: string }
@@ -156,9 +155,10 @@ export function studioReducer(state: StudioState, action: StudioAction): StudioS
       if (state.look === null) {
         return { ...state, pending: false, pendingCall: null };
       }
-      const step = commitEdit(state.history, state.look, action.command);
-      const look = step === null ? state.look : (step.look ?? state.look);
-      const text = step === null ? "That didn't change the look." : describeEdit(state.look, action.command);
+      const step = commitEdits(state.history, state.look, action.edits.commands);
+      const look = step === null ? state.look : step.look;
+      const skippedNote = action.edits.skipped > 0 ? ["I couldn't work out the rest of that request."] : [];
+      const text = [...(step === null ? ["That didn't change the look."] : step.summary), ...skippedNote].join(" ");
       return {
         ...state,
         pending: false,

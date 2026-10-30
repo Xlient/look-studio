@@ -1,6 +1,6 @@
 import { toJSONSchema, z } from "zod";
-import { AnchorRegion, EditCommand, EditOp, HexColor, MakeupArea, WearableType } from "@look-studio/shared";
-import type { LookSpec } from "@look-studio/shared";
+import { AnchorRegion, EditCommand, EditOp, HexColor, MAX_EDITS, MakeupArea, WearableType } from "@look-studio/shared";
+import type { EditBatch, LookSpec } from "@look-studio/shared";
 import { MAKEUP_OPACITY_CAP, toWearableSpec } from "./look-draft.ts";
 
 export const NEW_TARGET_ID = "new";
@@ -18,18 +18,21 @@ export const EditDraft = z.object({
 });
 export type EditDraft = z.infer<typeof EditDraft>;
 
-export const EditDraftJsonSchema = toJSONSchema(EditDraft) as unknown as Record<string, unknown>;
+export const EditBatchDraft = z.object({ edits: z.array(EditDraft) });
+
+export const EditBatchDraftJsonSchema = toJSONSchema(EditBatchDraft) as unknown as Record<string, unknown>;
 
 export function buildEditPrompt(utterance: string, look: LookSpec): string {
   const items = look.wearables.map(
-    (wearable) => `- ${wearable.id}: ${wearable.label} (${wearable.type}, ${wearable.anchor.region})`,
+    (wearable) => `- ${wearable.id}: ${wearable.label} (${wearable.type}, ${wearable.anchor.region}, colour ${wearable.color ?? "default"})`,
   );
   const makeup = MakeupArea.options.map((area) => {
     const layer = look.makeup?.[area];
     return `- ${area}: ${layer === undefined ? "bare" : `${layer.color} at opacity ${layer.opacity}`}`;
   });
   return [
-    "You are Look Artist, the stylist inside Look Studio. Turn the user's request into one edit.",
+    `You are Look Artist, the stylist inside Look Studio. Turn the user's request into a list of edits, at most ${MAX_EDITS}.`,
+    "- Make one edit for every change requested. Never drop part of the request; a message naming brows and lipstick needs two edits.",
     `Current look: ${look.name} (${look.style}).`,
     "Current wearables:",
     ...(items.length === 0 ? ["- none"] : items),
@@ -37,6 +40,9 @@ export function buildEditPrompt(utterance: string, look: LookSpec): string {
     ...makeup,
     `- For wearables, targetId must be one of the wearable ids above, or "${NEW_TARGET_ID}" when op is "add".`,
     `- For makeup (lips, blush, eyeshadow, brows), use op "makeup" with targetId set to the area, color as #RRGGBB, and opacity from 0 to 1 (0 removes it, null keeps the current one).`,
+    "- Wearables and makeup are separate. Glasses, hats, and other items use recolor with the wearable's id, never op makeup.",
+    "- Colour words such as white, black, or brown on a wearable or on makeup only name a colour. They are not requests about skin.",
+    "- Relative requests start from the current values above. A little lighter or darker: shift the current colour about 25% toward white or black and keep its hue. More subtle or less bold: lower opacity by about a third and keep the colour (color null). A different shade: a nearby shade in the same colour family.",
     "- add: fill wearable. recolor: color as #RRGGBB, for wearables only. scale: factor (2 = twice as big).",
     `- move: delta in head-widths, each axis between -${MAX_DELTA} and ${MAX_DELTA}; +y is up, +x is the viewer's right, +z is toward the camera.`,
     "- Set every field that the op does not use to null.",
@@ -114,6 +120,12 @@ function resolveCommand(draft: EditDraft, look: LookSpec, newId: string): EditCo
       return factor === null ? null : { op: "scale", targetId, factor };
     }
   }
+}
+
+export function draftsToEditBatch(drafts: EditDraft[], look: LookSpec, newId: () => string): EditBatch | null {
+  const wanted = drafts.slice(0, MAX_EDITS);
+  const commands = wanted.flatMap((draft) => draftToEditCommand(draft, look, newId()) ?? []);
+  return commands.length === 0 ? null : { commands, skipped: wanted.length - commands.length };
 }
 
 export function draftToEditCommand(draft: EditDraft, look: LookSpec, newId: string): EditCommand | null {

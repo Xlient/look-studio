@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { BudgetTracker } from "@look-studio/shared";
 import type {
   CritiqueReport,
-  EditCommand,
+  EditBatch,
   LookSpec,
   WearableSpec,
 } from "@look-studio/shared";
@@ -56,7 +56,7 @@ export interface EditRequest {
 }
 
 export interface EditService {
-  edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditCommand>>;
+  edit(request: EditRequest, signal: AbortSignal): Promise<ServiceResult<EditBatch>>;
 }
 
 export interface FitCheckRequest {
@@ -95,9 +95,9 @@ export class FakeLookService implements LookService {
 }
 
 export class FakeEditService implements EditService {
-  async edit(request: EditRequest): Promise<ServiceResult<EditCommand>> {
+  async edit(request: EditRequest): Promise<ServiceResult<EditBatch>> {
     void request;
-    return { data: { op: "toggle", targetId: "wearable-fake-1" }, meta: FAKE_META };
+    return { data: { commands: [{ op: "toggle", targetId: "wearable-fake-1" }], skipped: 0 }, meta: FAKE_META };
   }
 }
 

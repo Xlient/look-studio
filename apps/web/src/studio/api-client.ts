@@ -1,4 +1,4 @@
-import { EditCommand, LookSpec } from "@look-studio/shared";
+import { EditBatch, LookSpec } from "@look-studio/shared";
 import type { WearableSpec } from "@look-studio/shared";
 import { readSse } from "./sse.ts";
 import { parseJobStatus } from "./wearable-jobs.ts";
@@ -226,9 +226,9 @@ export async function watchWearableJob(
 export function requestEdit(
   input: { utterance: string; look: LookSpec },
   options: RequestOptions,
-): Promise<ApiResult<EditCommand>> {
-  return postJson("/api/edit", input, "command", (value) => {
-    const checked = EditCommand.safeParse(value);
+): Promise<ApiResult<EditBatch>> {
+  return postJson("/api/edit", input, "edits", (value) => {
+    const checked = EditBatch.safeParse(value);
     return checked.success ? checked.data : null;
   }, options);
 }

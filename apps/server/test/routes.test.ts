@@ -65,7 +65,7 @@ describe("POST /api/edit", () => {
   it("returns an EditCommand for a valid look", async () => {
     const res = await post(createApp(), "/api/edit", { utterance: "hide the glasses", look });
     expect(res.status).toBe(200);
-    expect(((await res.json()) as { command: { op: string } }).command.op).toBe("toggle");
+    expect(((await res.json()) as { edits: { commands: { op: string }[] } }).edits.commands[0]?.op).toBe("toggle");
   });
 
   it("rejects an invalid look", async () => {

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
-import { EditCommand, LookSpec } from "@look-studio/shared";
+import { EditBatch, LookSpec } from "@look-studio/shared";
 import { clientIp } from "../lib/rate-limit.ts";
 import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { EditService } from "../lib/services.ts";
@@ -33,11 +33,11 @@ async function handleEdit(c: Context, service: EditService, budgets: ClientBudge
       { utterance: parsed.data.utterance, look: parsed.data.look, budget: budgets.forClient(clientIp(c)) },
       c.req.raw.signal,
     );
-    const checked = EditCommand.safeParse(result.data);
+    const checked = EditBatch.safeParse(result.data);
     if (!checked.success) {
       return serviceError(c);
     }
-    return c.json({ ok: true, command: checked.data, meta: result.meta });
+    return c.json({ ok: true, edits: checked.data, meta: result.meta });
   } catch (error) {
     return modelErrorResponse(c, error);
   }

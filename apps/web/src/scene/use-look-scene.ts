@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import type { Makeup } from "@look-studio/shared";
+import type { Grooming, Makeup } from "@look-studio/shared";
 import type { HeadState } from "../tracking/head-state.ts";
 import { createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
 import type { Viewport } from "./head-anchor.ts";
@@ -9,7 +9,9 @@ import type { WearableLayout } from "./wearable-layout.ts";
 import type { LookScene } from "./look-scene.ts";
 import { createMakeupPainter } from "./makeup-painter.ts";
 import { createMakeupGeometry, writeMakeupGeometry } from "./makeup-regions.ts";
-import { makeupPasses } from "./makeup-style.ts";
+import { groomingShape, makeupPasses } from "./makeup-style.ts";
+import { createHairPatterns } from "./hair-texture.ts";
+import { NATURAL_SHAPE } from "./makeup-regions.ts";
 import { NO_SKIN, createSkinSmoother } from "./skin-smoother.ts";
 import type { SkinRender, SmoothLayer } from "./skin-smoother.ts";
 import { WOBBLE_PARAMS, createWobble, stepWobble } from "./wobble.ts";
@@ -35,6 +37,7 @@ export function useLookScene(
   active: boolean,
   mirror: boolean,
   makeup: Makeup | undefined,
+  grooming: Grooming | undefined,
   plain: boolean,
   wearables: WearableLayout,
   skin: SkinRender,
@@ -43,6 +46,7 @@ export function useLookScene(
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
   const passesRef = useRef<MakeupPass[]>([]);
+  const shapeRef = useRef(NATURAL_SHAPE);
   const plainRef = useRef(plain);
   plainRef.current = plain;
   const skinRef = useRef(skin);
@@ -57,8 +61,9 @@ export function useLookScene(
   }, [wearables]);
 
   useEffect(() => {
-    passesRef.current = makeupPasses(makeup);
-  }, [makeup]);
+    passesRef.current = makeupPasses(makeup, grooming);
+    shapeRef.current = groomingShape(grooming);
+  }, [makeup, grooming]);
 
   useEffect(() => {
     viewRef.current.mirror = mirror;
@@ -73,7 +78,8 @@ export function useLookScene(
     if (!active || canvas === null || video === null || context === null) {
       return;
     }
-    const painter = createMakeupPainter(context, createSkinSmoother(createLayer));
+    const hair = createHairPatterns(context, () => createLayer(false));
+    const painter = createMakeupPainter(context, createSkinSmoother(createLayer), hair);
     const geometry = createMakeupGeometry();
     const scene = createLookScene(canvas, backdrop);
     sceneRef.current = scene;
@@ -102,7 +108,7 @@ export function useLookScene(
       const plainFrame = plainRef.current;
       const passes = plainFrame ? NO_PASSES : passesRef.current;
       const skinFrame = plainFrame ? NO_SKIN : skinRef.current;
-      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height), passes, view.width, view.height, skinFrame);
+      painter.paint(video, writeMakeupGeometry(geometry, head, view.width, view.height, shapeRef.current), passes, view.width, view.height, skinFrame);
       writeHeadAnchor(anchor, head, view);
       anchor.visible = anchor.visible && !plainRef.current;
       const headProp = wearablesRef.current.head;

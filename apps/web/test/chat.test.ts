@@ -50,7 +50,7 @@ describe("studio undo and streaming", () => {
     let state = initialStudioState("9:00");
     expect(canUndo(state)).toBe(false);
     state = studioReducer(state, { type: "look-received", at: "9:01", look: gold, meta });
-    state = studioReducer(state, { type: "edit-received", at: "9:02", command: { op: "toggle", targetId: "w1" }, meta });
+    state = studioReducer(state, { type: "edit-received", at: "9:02", edits: { commands: [{ op: "toggle", targetId: "w1" }], skipped: 0 }, meta });
     state = studioReducer(state, { type: "reset", at: "9:03" });
     expect(state.look).toBeNull();
     state = studioReducer(state, { type: "undo", at: "9:04" });
@@ -61,6 +61,27 @@ describe("studio undo and streaming", () => {
     state = studioReducer(state, { type: "redo", at: "9:06" });
     expect(state.look?.wearables[0]?.visible).toBe(false);
     expect(state.messages.at(-1)?.text).toBe("Redo: back to Gold.");
+  });
+
+  it("applies a whole revision as one undo step and says what it skipped", () => {
+    let state = studioReducer(initialStudioState("9:00"), { type: "look-received", at: "9:01", look: gold, meta });
+    state = studioReducer(state, {
+      type: "edit-received",
+      at: "9:02",
+      edits: {
+        commands: [
+          { op: "makeup", targetId: "brows", color: "#8A7560", opacity: 0.4 },
+          { op: "makeup", targetId: "lips", color: "#C76B6B", opacity: 0.45 },
+        ],
+        skipped: 1,
+      },
+      meta,
+    });
+    expect(state.look?.makeup?.brows?.color).toBe("#8A7560");
+    expect(state.look?.makeup?.lips?.color).toBe("#C76B6B");
+    expect(state.messages.at(-1)?.text).toBe("Changed brows to #8A7560. Changed lips to #C76B6B. I couldn't work out the rest of that request.");
+    state = studioReducer(state, { type: "undo", at: "9:03" });
+    expect(state.look).toEqual(gold);
   });
 
   it("ignores undo while a call is pending and a reset with no look", () => {

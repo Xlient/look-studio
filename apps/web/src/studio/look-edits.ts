@@ -101,8 +101,7 @@ export function applyEdit(look: LookSpec, command: EditCommand): LookSpec {
       if (color === undefined) {
         return look;
       }
-      const palette = [color, ...(look.palette ?? []).filter((entry) => entry !== color)].slice(0, 8);
-      return { ...look, palette };
+      return updateWearable(look, command.targetId, (wearable) => ({ ...wearable, color }));
     }
     case "makeup":
       return applyMakeup(look, command);
