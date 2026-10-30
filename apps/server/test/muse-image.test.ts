@@ -1,3 +1,4 @@
+import type { BudgetTracker } from "@look-studio/shared";
 import OpenAI from "openai";
 import { describe, expect, it } from "vitest";
 import { buildConceptPrompt } from "../src/lib/avatar-prompts.ts";
@@ -44,10 +45,12 @@ const ok = (count: number) =>
     headers: { "content-type": "application/json" },
   });
 
+const noBudget: BudgetTracker = { record: () => 0, remaining: () => 1, isExceeded: () => false };
+
 describe("Muse Image concepts", () => {
   it("asks for three A-pose WebP concepts from text and bills each image", async () => {
     const { concepts, requests, images } = service([ok(3)]);
-    const result = await concepts.createConcepts({ description: "grumpy robot barista" }, new AbortController().signal);
+    const result = await concepts.createConcepts({ budget: noBudget, description: "grumpy robot barista" }, new AbortController().signal);
     expect(result).toEqual(Array.from({ length: 3 }, () => `data:image/webp;base64,${B64}`));
     expect(requests[0]?.url).toBe("https://api.meta.ai/v1/images/generations");
     expect(JSON.parse(requests[0]?.body ?? "{}")).toMatchObject({ model: MUSE_IMAGE_MODEL, n: 3, output_format: "webp" });
@@ -56,7 +59,7 @@ describe("Muse Image concepts", () => {
 
   it("uses the edits endpoint with the photo as a reference, never as a likeness", async () => {
     const { concepts, requests } = service([ok(3)]);
-    await concepts.createConcepts({ description: "streetwear fox", photo: PHOTO }, new AbortController().signal);
+    await concepts.createConcepts({ budget: noBudget, description: "streetwear fox", photo: PHOTO }, new AbortController().signal);
     expect(requests[0]?.url).toBe("https://api.meta.ai/v1/images/edits");
     expect(requests[0]?.multipart).toBe(true);
     expect(buildConceptPrompt("x", true)).toContain("Do not copy the person's face");
@@ -68,17 +71,17 @@ describe("Muse Image concepts", () => {
       headers: { "content-type": "application/json" },
     });
     const { concepts, requests } = service([blocked]);
-    await expect(concepts.createConcepts({ description: "x" }, new AbortController().signal)).rejects.toBeInstanceOf(ContentBlockedError);
+    await expect(concepts.createConcepts({ budget: noBudget, description: "x" }, new AbortController().signal)).rejects.toBeInstanceOf(ContentBlockedError);
     expect(requests).toHaveLength(1);
   });
 
   it("retries a 503 once and respects the image rate limit", async () => {
     const { concepts, requests } = service([new Response("busy", { status: 503 }), ok(3)]);
-    await concepts.createConcepts({ description: "x" }, new AbortController().signal);
+    await concepts.createConcepts({ budget: noBudget, description: "x" }, new AbortController().signal);
     expect(requests).toHaveLength(2);
     const limited = service([ok(3)], 3);
-    await limited.concepts.createConcepts({ description: "x" }, new AbortController().signal);
-    await expect(limited.concepts.createConcepts({ description: "x" }, new AbortController().signal)).rejects.toMatchObject({ kind: "rate_limited" });
+    await limited.concepts.createConcepts({ budget: noBudget, description: "x" }, new AbortController().signal);
+    await expect(limited.concepts.createConcepts({ budget: noBudget, description: "x" }, new AbortController().signal)).rejects.toMatchObject({ kind: "rate_limited" });
     expect(limited.requests).toHaveLength(1);
   });
 

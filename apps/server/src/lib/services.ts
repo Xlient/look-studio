@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import type { BudgetTracker } from "@look-studio/shared";
 import type {
   CritiqueReport,
   EditBatch,
@@ -36,6 +38,7 @@ export const FAKE_META: ModelCallMeta = {
 export interface LookRequest {
   chat: string;
   image?: string;
+  budget: BudgetTracker;
 }
 
 export interface LookService {
@@ -49,6 +52,7 @@ export interface LookService {
 export interface EditRequest {
   utterance: string;
   look: LookSpec;
+  budget: BudgetTracker;
 }
 
 export interface EditService {
@@ -74,8 +78,8 @@ export interface JobStatus {
 }
 
 export interface WearableService {
-  createJob(spec: WearableSpec): Promise<string>;
-  getJob(jobId: string): JobStatus | null;
+  createJob(spec: WearableSpec, owner: string): Promise<string>;
+  getJob(jobId: string, owner: string): JobStatus | null;
   subscribe(
     jobId: string,
     emit: (status: JobStatus) => Promise<void>,
@@ -111,27 +115,33 @@ export class FakeFitCheckService implements FitCheckService {
 }
 
 export class FakeWearableService implements WearableService {
-  private readonly jobs = new Map<string, JobStatus[]>();
-  private nextId = 1;
+  private readonly jobs = new Map<string, { owner: string; states: JobStatus[] }>();
+  private readonly newId: () => string;
 
-  async createJob(spec: WearableSpec): Promise<string> {
+  constructor(newId: () => string = randomUUID) {
+    this.newId = newId;
+  }
+
+  async createJob(spec: WearableSpec, owner: string): Promise<string> {
     void spec;
-    const jobId = `job-fake-${this.nextId}`;
-    this.nextId += 1;
-    this.jobs.set(jobId, [
-      { jobId, state: "queued" },
-      { jobId, state: "running", progress: { completed: 1, total: 2 } },
-      { jobId, state: "succeeded", progress: { completed: 2, total: 2 } },
-    ]);
+    const jobId = `job-fake-${this.newId()}`;
+    this.jobs.set(jobId, {
+      owner,
+      states: [
+        { jobId, state: "queued" },
+        { jobId, state: "running", progress: { completed: 1, total: 2 } },
+        { jobId, state: "succeeded", progress: { completed: 2, total: 2 } },
+      ],
+    });
     return jobId;
   }
 
-  getJob(jobId: string): JobStatus | null {
-    const states = this.jobs.get(jobId);
-    if (states === undefined) {
+  getJob(jobId: string, owner: string): JobStatus | null {
+    const job = this.jobs.get(jobId);
+    if (job === undefined || job.owner !== owner) {
       return null;
     }
-    return states[states.length - 1];
+    return job.states[job.states.length - 1];
   }
 
   async subscribe(
@@ -139,7 +149,7 @@ export class FakeWearableService implements WearableService {
     emit: (status: JobStatus) => Promise<void>,
     signal: AbortSignal,
   ): Promise<void> {
-    const states = this.jobs.get(jobId) ?? [];
+    const states = this.jobs.get(jobId)?.states ?? [];
     for (const status of states) {
       if (signal.aborted) {
         return;

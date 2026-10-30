@@ -26,12 +26,13 @@ import type {
   LookService,
   WearableService,
 } from "./lib/services.ts";
-import { defaultBudgetTracker, estimateCostUsd } from "./lib/spend-cap.ts";
+import { ClientBudgets, clientDailySpendCapUsd, defaultBudgetTracker, estimateCostUsd } from "./lib/spend-cap.ts";
 
 export interface Container {
   readonly rateLimiter: RateLimiter;
   readonly modelRateLimiter: RateLimiter;
   readonly budgetTracker: BudgetTracker;
+  readonly clientBudgets: ClientBudgets;
   readonly retryPolicy: RetryPolicy;
   readonly lookService: LookService;
   readonly editService: EditService;
@@ -77,10 +78,12 @@ function fakeAvatarStudio(): AvatarService {
 const defaultModelRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 3000, windowMs: 60_000 }));
 
 export function createContainer(overrides: Partial<Container> = {}): Container {
+  const budgetTracker = overrides.budgetTracker ?? defaultBudgetTracker;
   return {
     rateLimiter: overrides.rateLimiter ?? defaultRateLimiter,
     modelRateLimiter: overrides.modelRateLimiter ?? defaultModelRateLimiter,
-    budgetTracker: overrides.budgetTracker ?? defaultBudgetTracker,
+    budgetTracker,
+    clientBudgets: overrides.clientBudgets ?? new ClientBudgets(clientDailySpendCapUsd, budgetTracker),
     retryPolicy: overrides.retryPolicy ?? defaultRetryPolicy,
     lookService: overrides.lookService ?? new FakeLookService(),
     editService: overrides.editService ?? new FakeEditService(),
@@ -100,7 +103,6 @@ export function createLiveContainer(overrides: Partial<Container> = {}): Contain
   const deps = {
     retryPolicy: base.retryPolicy,
     rateLimiter: base.modelRateLimiter,
-    budget: base.budgetTracker,
     newId: () => randomUUID(),
   };
   return {
@@ -113,7 +115,7 @@ export function createLiveContainer(overrides: Partial<Container> = {}): Contain
       new MuseAvatarCheckService({
         retryPolicy: base.retryPolicy,
         rateLimiter: base.modelRateLimiter,
-        onTokens: (total) => base.budgetTracker.record(estimateCostUsd(total)),
+        onTokens: (total, budget) => budget.record(estimateCostUsd(total)),
       }),
   };
 }
@@ -123,18 +125,17 @@ function liveAvatarStudio(base: Container): AvatarService {
   if (!meshyKey) {
     return base.avatarService;
   }
-  const budget = base.budgetTracker;
   return new AvatarStudio({
     moderation: new MuseModeration({
       retryPolicy: base.retryPolicy,
       rateLimiter: base.modelRateLimiter,
-      onTokens: (total) => budget.record(estimateCostUsd(total)),
+      onTokens: (total, budget) => budget.record(estimateCostUsd(total)),
     }),
     concepts: new MuseImageConceptService({
       client: createModelClient(),
       retryPolicy: base.retryPolicy,
       rateLimiter: imageRateLimiter,
-      onImages: (count) => budget.record(count * MUSE_IMAGE_PRICE_USD),
+      onImages: (count, budget) => budget.record(count * MUSE_IMAGE_PRICE_USD),
     }),
     provider: new MeshyAvatarProvider({
       client: createMeshyClient(meshyKey),
@@ -145,7 +146,7 @@ function liveAvatarStudio(base: Container): AvatarService {
     queue: new InlineJobQueue(),
     now: Date.now,
     newId: () => randomUUID(),
-    onAvatarBuilt: () => budget.record(meshyCostUsd()),
+    onAvatarBuilt: (budget) => budget.record(meshyCostUsd()),
   });
 }
 

@@ -1,7 +1,7 @@
 import { APIError, toFile } from "openai";
 import type OpenAI from "openai";
 import { AVATAR_CONCEPT_COUNT, AvatarImage } from "@look-studio/shared";
-import type { RateLimiter, RetryPolicy } from "@look-studio/shared";
+import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { envNumber } from "../env.ts";
 import { buildConceptPrompt } from "./avatar-prompts.ts";
 import { logInfo } from "./logger.ts";
@@ -25,6 +25,7 @@ export class ContentBlockedError extends Error {
 export interface ConceptRequest {
   description: string;
   photo?: string;
+  budget: BudgetTracker;
 }
 
 export interface ConceptService {
@@ -35,7 +36,7 @@ export interface ImageDeps {
   readonly client: OpenAI;
   readonly retryPolicy: RetryPolicy;
   readonly rateLimiter: RateLimiter;
-  readonly onImages: (count: number) => void;
+  readonly onImages: (count: number, budget: BudgetTracker) => void;
 }
 
 function dataUrlParts(dataUrl: string): { mime: string; bytes: Buffer } {
@@ -102,7 +103,7 @@ export class MuseImageConceptService implements ConceptService {
         { signal, shouldRetry: isRetryable },
       );
       const images = toConceptImages(response.data, "webp");
-      this.deps.onImages(images.length);
+      this.deps.onImages(images.length, request.budget);
       logInfo({ event: "model_call", model: MUSE_IMAGE_MODEL, latencyMs: Date.now() - startedAt, images: images.length });
       return images;
     } catch (error) {

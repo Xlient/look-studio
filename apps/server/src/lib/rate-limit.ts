@@ -1,7 +1,9 @@
+import { isIP } from "node:net";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { RateLimitDecision, RateLimiter } from "@look-studio/shared";
 import { envNumber } from "../env.ts";
+import { logInfo } from "./logger.ts";
 
 interface Bucket {
   count: number;
@@ -62,10 +64,38 @@ export function rateLimitWindowMs(): number {
   return envNumber("RATE_LIMIT_WINDOW_MS", 60_000);
 }
 
+export function trustedProxyHops(): number {
+  const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0);
+  return Number.isInteger(hops) && hops > 0 ? hops : 0;
+}
+
+// Entries left of the trusted hops are client-supplied, so only the rightmost hops can be believed.
+export function forwardedClientIp(header: string | undefined, hops: number): string | null {
+  if (header === undefined || hops < 1) {
+    return null;
+  }
+  const entries = header.split(",").map((entry) => entry.trim());
+  const candidate = entries[entries.length - hops];
+  return candidate !== undefined && isIP(candidate) !== 0 ? candidate : null;
+}
+
+let warnedUnsetHops = false;
+
+function warnIfHopsUnset(header: string | undefined, hops: number): void {
+  if (header === undefined || hops > 0 || warnedUnsetHops) {
+    return;
+  }
+  warnedUnsetHops = true;
+  logInfo({ event: "trusted_proxy_hops_unset", forwardedEntries: header.split(",").length });
+}
+
 export function clientIp(c: Context): string {
-  const first = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  if (first) {
-    return first;
+  const header = c.req.header("x-forwarded-for");
+  const hops = trustedProxyHops();
+  warnIfHopsUnset(header, hops);
+  const forwarded = forwardedClientIp(header, hops);
+  if (forwarded !== null) {
+    return forwarded;
   }
   try {
     return getConnInfo(c).remote.address ?? "unknown";

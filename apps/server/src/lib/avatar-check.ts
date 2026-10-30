@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { AvatarCheck } from "@look-studio/shared";
-import type { RateLimiter, RetryPolicy } from "@look-studio/shared";
+import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { acquire, MUSE_SPARK_MODEL } from "./muse-services.ts";
 import { callModelWithImage } from "./model-client.ts";
 import type { FetchFn } from "./model-client.ts";
 import { ModelError } from "./model-errors.ts";
 
 export interface AvatarCheckService {
-  check(renders: { front: string; side: string }, signal: AbortSignal): Promise<AvatarCheck>;
+  check(renders: { front: string; side: string }, budget: BudgetTracker, signal: AbortSignal): Promise<AvatarCheck>;
 }
 
 const ISSUE_MAX = 200;
@@ -50,7 +50,7 @@ Set faceFound to true if you can see eyes and a mouth in the first image, and gi
 export interface MuseAvatarCheckDeps {
   readonly retryPolicy: RetryPolicy;
   readonly rateLimiter: RateLimiter;
-  readonly onTokens: (total: number) => void;
+  readonly onTokens: (total: number, budget: BudgetTracker) => void;
   readonly fetch?: FetchFn;
 }
 
@@ -61,7 +61,7 @@ export class MuseAvatarCheckService implements AvatarCheckService {
     this.deps = deps;
   }
 
-  async check(renders: { front: string; side: string }, signal: AbortSignal): Promise<AvatarCheck> {
+  async check(renders: { front: string; side: string }, budget: BudgetTracker, signal: AbortSignal): Promise<AvatarCheck> {
     acquire(this.deps.rateLimiter, MUSE_SPARK_MODEL);
     const result = await callModelWithImage<unknown>({
       model: MUSE_SPARK_MODEL,
@@ -74,7 +74,7 @@ export class MuseAvatarCheckService implements AvatarCheckService {
       fetch: this.deps.fetch,
       reasoningEffort: "low",
     });
-    this.deps.onTokens(result.tokens.total);
+    this.deps.onTokens(result.tokens.total, budget);
     const draft = AvatarCheckDraft.safeParse(result.data);
     if (!draft.success) {
       throw new ModelError("invalid_response", { model: MUSE_SPARK_MODEL });

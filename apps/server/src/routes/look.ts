@@ -3,18 +3,19 @@ import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { LookSpec } from "@look-studio/shared";
-import type { BudgetTracker } from "@look-studio/shared";
+import { clientIp } from "../lib/rate-limit.ts";
 import { invalidRequest, modelErrorBody, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import type { LookRequest, LookService } from "../lib/services.ts";
 import { asksToChangeSkinTone } from "../lib/skin-tone-guard.ts";
 import { createSpendCapMiddleware } from "../lib/spend-cap.ts";
+import type { ClientBudgets } from "../lib/spend-cap.ts";
 
 const LookRequestBody = z.object({
   chat: z.string().min(1).max(2000),
   image: z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).optional(),
 });
 
-async function parseLookRequest(c: Context): Promise<LookRequest | Response> {
+async function parseLookRequest(c: Context, budgets: ClientBudgets): Promise<LookRequest | Response> {
   const body = await readJsonBody(c);
   if (!body.ok) {
     return body.error === "body_too_large"
@@ -28,11 +29,11 @@ async function parseLookRequest(c: Context): Promise<LookRequest | Response> {
   if (asksToChangeSkinTone(parsed.data.chat)) {
     return c.json({ ok: false, error: "skin_tone_change" }, 422);
   }
-  return { chat: parsed.data.chat, image: parsed.data.image };
+  return { chat: parsed.data.chat, image: parsed.data.image, budget: budgets.forClient(clientIp(c)) };
 }
 
-async function handleLook(c: Context, service: LookService): Promise<Response> {
-  const request = await parseLookRequest(c);
+async function handleLook(c: Context, service: LookService, budgets: ClientBudgets): Promise<Response> {
+  const request = await parseLookRequest(c, budgets);
   if (request instanceof Response) {
     return request;
   }
@@ -48,8 +49,8 @@ async function handleLook(c: Context, service: LookService): Promise<Response> {
   }
 }
 
-async function handleLookStream(c: Context, service: LookService): Promise<Response> {
-  const request = await parseLookRequest(c);
+async function handleLookStream(c: Context, service: LookService, budgets: ClientBudgets): Promise<Response> {
+  const request = await parseLookRequest(c, budgets);
   if (request instanceof Response) {
     return request;
   }
@@ -75,10 +76,10 @@ async function handleLookStream(c: Context, service: LookService): Promise<Respo
   });
 }
 
-export function createLookRoutes(service: LookService, budget: BudgetTracker): Hono {
+export function createLookRoutes(service: LookService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budget));
-  app.post("/api/look", (c) => handleLook(c, service));
-  app.post("/api/look/stream", (c) => handleLookStream(c, service));
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/look", spendCap, (c) => handleLook(c, service, budgets));
+  app.post("/api/look/stream", spendCap, (c) => handleLookStream(c, service, budgets));
   return app;
 }
