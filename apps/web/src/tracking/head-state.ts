@@ -1,8 +1,12 @@
+import { EXPRESSION_COUNT, writeExpressions } from "./expressions.ts";
+import type { BlendshapeScore } from "./expressions.ts";
+
 export const LANDMARK_COUNT = 478;
 
 export interface HeadState {
   readonly landmarks: Float32Array;
   readonly pose: Float32Array;
+  readonly expressions: Float32Array;
   landmarkCount: number;
   confidence: number;
   timestampMs: number;
@@ -17,6 +21,7 @@ export interface LandmarkPoint {
 export interface FaceSample {
   faceLandmarks: LandmarkPoint[][];
   facialTransformationMatrixes?: { data: number[] }[];
+  faceBlendshapes?: { categories: BlendshapeScore[] }[];
 }
 
 export function createHeadState(): HeadState {
@@ -25,6 +30,7 @@ export function createHeadState(): HeadState {
   return {
     landmarks: new Float32Array(LANDMARK_COUNT * 3),
     pose,
+    expressions: new Float32Array(EXPRESSION_COUNT),
     landmarkCount: 0,
     confidence: 0,
     timestampMs: 0,
@@ -37,6 +43,7 @@ export function writeHeadState(target: HeadState, sample: FaceSample, timestampM
   if (face === undefined || face.length === 0) {
     target.landmarkCount = 0;
     target.confidence = 0;
+    target.expressions.fill(0);
     return target;
   }
   const count = Math.min(face.length, LANDMARK_COUNT);
@@ -55,6 +62,7 @@ export function writeHeadState(target: HeadState, sample: FaceSample, timestampM
   }
   target.landmarkCount = count;
   target.confidence = inFrame / count;
+  writeExpressions(target.expressions, sample.faceBlendshapes?.[0]?.categories);
   const matrix = sample.facialTransformationMatrixes?.[0]?.data;
   if (matrix !== undefined && matrix.length >= 16) {
     for (let i = 0; i < 16; i += 1) {

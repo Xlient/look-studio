@@ -2,6 +2,7 @@ import { FaceLandmarker } from "@mediapipe/tasks-vision";
 import wasmLoaderPath from "@mediapipe/tasks-vision/vision_wasm_internal.js?url";
 import wasmBinaryPath from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
 import type { FaceDetector } from "./face-tracker.ts";
+import type { LandmarkPoint } from "./head-state.ts";
 
 export const FACE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -31,7 +32,7 @@ export async function createFaceLandmarker(signal: AbortSignal): Promise<FaceDet
       runningMode: "VIDEO",
       numFaces: 1,
       outputFacialTransformationMatrixes: true,
-      outputFaceBlendshapes: false,
+      outputFaceBlendshapes: true,
     },
   );
   if (signal.aborted) {
@@ -39,4 +40,17 @@ export async function createFaceLandmarker(signal: AbortSignal): Promise<FaceDet
     throw new LandmarkerLoadError("Face tracker setup was cancelled.");
   }
   return landmarker;
+}
+
+export async function detectFaceOnce(image: HTMLCanvasElement, signal: AbortSignal): Promise<LandmarkPoint[] | null> {
+  const modelAssetBuffer = await fetchModel(signal);
+  const landmarker = await FaceLandmarker.createFromOptions(
+    { wasmLoaderPath, wasmBinaryPath },
+    { baseOptions: { modelAssetBuffer, delegate: "CPU" }, runningMode: "IMAGE", numFaces: 1 },
+  );
+  try {
+    return landmarker.detect(image).faceLandmarks[0] ?? null;
+  } finally {
+    landmarker.close();
+  }
 }

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
+import { FakeAvatarCheckService, MuseAvatarCheckService } from "./lib/avatar-check.ts";
+import type { AvatarCheckService } from "./lib/avatar-check.ts";
 import { AvatarStudio } from "./lib/avatar-studio.ts";
 import type { AvatarService } from "./lib/avatar-studio.ts";
 import { FakeAvatarProvider, FakeConceptService } from "./lib/avatar-fakes.ts";
@@ -37,6 +39,8 @@ export interface Container {
   readonly wearableService: WearableService;
   readonly avatarService: AvatarService;
   readonly avatarLimiter: RateLimiter;
+  readonly avatarCheckService: AvatarCheckService;
+  readonly avatarCheckLimiter: RateLimiter;
 }
 
 // Rough USD per rigged avatar on the Meshy Pro plan; set MESHY_COST_USD to your real rate.
@@ -46,6 +50,11 @@ export function meshyCostUsd(): number {
 
 const defaultAvatarLimiter: RateLimiter = new InMemoryRateLimiter(() => ({
   max: envNumber("AVATAR_DAILY_LIMIT", 3),
+  windowMs: 24 * 60 * 60_000,
+}));
+
+const defaultAvatarCheckLimiter: RateLimiter = new InMemoryRateLimiter(() => ({
+  max: envNumber("AVATAR_CHECK_DAILY_LIMIT", 12),
   windowMs: 24 * 60 * 60_000,
 }));
 
@@ -79,6 +88,8 @@ export function createContainer(overrides: Partial<Container> = {}): Container {
     wearableService: overrides.wearableService ?? new FakeWearableService(),
     avatarService: overrides.avatarService ?? fakeAvatarStudio(),
     avatarLimiter: overrides.avatarLimiter ?? defaultAvatarLimiter,
+    avatarCheckService: overrides.avatarCheckService ?? new FakeAvatarCheckService(),
+    avatarCheckLimiter: overrides.avatarCheckLimiter ?? defaultAvatarCheckLimiter,
   };
 }
 
@@ -97,6 +108,13 @@ export function createLiveContainer(overrides: Partial<Container> = {}): Contain
     lookService: overrides.lookService ?? new MuseLookService(deps),
     editService: overrides.editService ?? new MuseEditService(deps),
     avatarService: overrides.avatarService ?? liveAvatarStudio(base),
+    avatarCheckService:
+      overrides.avatarCheckService ??
+      new MuseAvatarCheckService({
+        retryPolicy: base.retryPolicy,
+        rateLimiter: base.modelRateLimiter,
+        onTokens: (total) => base.budgetTracker.record(estimateCostUsd(total)),
+      }),
   };
 }
 

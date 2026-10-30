@@ -1,4 +1,4 @@
-import { AVATAR_CONCEPT_COUNT, AvatarConcept, AvatarJobStatus } from "@look-studio/shared";
+import { AVATAR_CONCEPT_COUNT, AvatarCheck, AvatarConcept, AvatarJobStatus } from "@look-studio/shared";
 import { failureFrom, postForPayload, resolveFetch, transportFailure } from "./api-client.ts";
 import type { ApiFailure, RequestOptions } from "./api-client.ts";
 
@@ -23,6 +23,18 @@ export async function requestConcepts(
   }
   const checked = AvatarConcept.array().min(1).max(AVATAR_CONCEPT_COUNT).safeParse(result.payload["concepts"]);
   return checked.success ? { ok: true, concepts: checked.data } : BAD_RESPONSE;
+}
+
+export async function requestAvatarCheck(
+  renders: { front: string; side: string },
+  options: RequestOptions,
+): Promise<{ ok: true; check: AvatarCheck } | ApiFailure> {
+  const result = await postForPayload("/api/avatar/check", renders, options);
+  if (!result.ok) {
+    return result;
+  }
+  const checked = AvatarCheck.safeParse(result.payload["check"]);
+  return checked.success ? { ok: true, check: checked.data } : BAD_RESPONSE;
 }
 
 export async function startAvatar(conceptId: string, options: RequestOptions): Promise<{ ok: true; jobId: string } | ApiFailure> {

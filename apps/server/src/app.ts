@@ -19,7 +19,7 @@ export function createApp(active: Container = container): Hono {
   app.route("/", createEditRoutes(active.editService, active.budgetTracker));
   app.route("/", createFitCheckRoutes(active.fitCheckService, active.budgetTracker));
   app.route("/", createWearableRoutes(active.wearableService, active.budgetTracker));
-  app.route("/", createAvatarRoutes(active.avatarService, active.budgetTracker, active.avatarLimiter));
+  app.route("/", createAvatarRoutes(active.avatarService, active.budgetTracker, active.avatarLimiter, { service: active.avatarCheckService, limiter: active.avatarCheckLimiter }));
   app.notFound((c) => c.json({ ok: false, error: "not_found" }, 404));
   return app;
 }
