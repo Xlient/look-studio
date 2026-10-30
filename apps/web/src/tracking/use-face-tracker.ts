@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { createFaceTracker } from "./face-tracker.ts";
 import type { HeadState } from "./head-state.ts";
 import { createFaceLandmarker } from "./landmarker.ts";
+import { LANDMARK_FILTER, POSE_FILTER, createOneEuroFilter } from "./one-euro-filter.ts";
 
 export type TrackerStatus = "off" | "loading" | "tracking" | "error";
 
@@ -34,6 +35,8 @@ export function useFaceTracker(videoRef: RefObject<HTMLVideoElement | null>, act
         const tracker = createFaceTracker({
           detector,
           video,
+          poseFilter: createOneEuroFilter(POSE_FILTER),
+          landmarkFilter: createOneEuroFilter(LANDMARK_FILTER),
           onFrame: (state, fps) => {
             headRef.current = state;
             if (state.timestampMs - lastReadout >= READOUT_INTERVAL_MS) {

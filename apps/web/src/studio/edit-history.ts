@@ -1,5 +1,5 @@
 import type { EditCommand, LookSpec, Makeup, WearableSpec } from "@look-studio/shared";
-import { applyEdit } from "./look-edits.ts";
+import { applyEdit, describeEdit } from "./look-edits.ts";
 
 export const MAX_HISTORY = 30;
 
@@ -7,11 +7,15 @@ type Restore =
   | { kind: "remove-at"; index: number }
   | { kind: "insert-at"; index: number; wearable: WearableSpec }
   | { kind: "replace-at"; index: number; wearable: WearableSpec }
-  | { kind: "palette"; palette: string[] | undefined }
   | { kind: "makeup"; makeup: Makeup | undefined };
 
+interface EditStep {
+  command: EditCommand;
+  restore: Restore;
+}
+
 export type HistoryEntry =
-  | { kind: "edit"; command: EditCommand; restore: Restore }
+  | { kind: "edit"; steps: EditStep[] }
   | { kind: "replace"; before: LookSpec | null; after: LookSpec | null };
 
 export interface EditHistory {
@@ -24,6 +28,11 @@ export interface HistoryStep {
   look: LookSpec | null;
 }
 
+export interface CommittedEdits extends HistoryStep {
+  look: LookSpec;
+  summary: string[];
+}
+
 export const EMPTY_HISTORY: EditHistory = { past: [], future: [] };
 
 function push(entries: HistoryEntry[], entry: HistoryEntry): HistoryEntry[] {
@@ -31,9 +40,6 @@ function push(entries: HistoryEntry[], entry: HistoryEntry): HistoryEntry[] {
 }
 
 function captureRestore(look: LookSpec, command: EditCommand): Restore | null {
-  if (command.op === "recolor") {
-    return { kind: "palette", palette: look.palette };
-  }
   if (command.op === "makeup") {
     return { kind: "makeup", makeup: look.makeup };
   }
@@ -57,14 +63,6 @@ function applyRestore(look: LookSpec, restore: Restore): LookSpec {
       return { ...look, wearables: [...wearables.slice(0, restore.index), restore.wearable, ...wearables.slice(restore.index)] };
     case "replace-at":
       return { ...look, wearables: wearables.map((wearable, index) => (index === restore.index ? restore.wearable : wearable)) };
-    case "palette": {
-      if (restore.palette !== undefined) {
-        return { ...look, palette: restore.palette };
-      }
-      const copy = { ...look };
-      delete copy.palette;
-      return copy;
-    }
     case "makeup": {
       if (restore.makeup !== undefined) {
         return { ...look, makeup: restore.makeup };
@@ -80,18 +78,22 @@ function sameLook(a: LookSpec, b: LookSpec): boolean {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
-function runEdit(look: LookSpec, command: EditCommand): { look: LookSpec; entry: HistoryEntry } | null {
-  const restore = captureRestore(look, command);
-  const next = applyEdit(look, command);
-  if (restore === null || sameLook(look, next)) {
-    return null;
+export function commitEdits(history: EditHistory, look: LookSpec, commands: EditCommand[]): CommittedEdits | null {
+  const steps: EditStep[] = [];
+  const summary: string[] = [];
+  let current = look;
+  for (const command of commands) {
+    const restore = captureRestore(current, command);
+    const next = applyEdit(current, command);
+    if (restore !== null && !sameLook(current, next)) {
+      steps.push({ command, restore });
+      summary.push(describeEdit(current, command));
+      current = next;
+    }
   }
-  return { look: next, entry: { kind: "edit", command, restore } };
-}
-
-export function commitEdit(history: EditHistory, look: LookSpec, command: EditCommand): HistoryStep | null {
-  const result = runEdit(look, command);
-  return result === null ? null : { look: result.look, history: { past: push(history.past, result.entry), future: [] } };
+  return steps.length === 0
+    ? null
+    : { look: current, summary, history: { past: push(history.past, { kind: "edit", steps }), future: [] } };
 }
 
 export function commitReplace(history: EditHistory, before: LookSpec | null, after: LookSpec | null): EditHistory {
@@ -103,7 +105,12 @@ export function undoStep(history: EditHistory, current: LookSpec | null): Histor
   if (entry === undefined) {
     return null;
   }
-  const look = entry.kind === "replace" ? entry.before : current === null ? null : applyRestore(current, entry.restore);
+  const look =
+    entry.kind === "replace"
+      ? entry.before
+      : current === null
+        ? null
+        : entry.steps.reduceRight((restored, step) => applyRestore(restored, step.restore), current);
   return { look, history: { past: history.past.slice(0, -1), future: [entry, ...history.future] } };
 }
 
@@ -112,6 +119,11 @@ export function redoStep(history: EditHistory, current: LookSpec | null): Histor
   if (entry === undefined) {
     return null;
   }
-  const look = entry.kind === "replace" ? entry.after : current === null ? null : applyEdit(current, entry.command);
+  const look =
+    entry.kind === "replace"
+      ? entry.after
+      : current === null
+        ? null
+        : entry.steps.reduce((applied, step) => applyEdit(applied, step.command), current);
   return { look, history: { past: push(history.past, entry), future: history.future.slice(1) } };
 }

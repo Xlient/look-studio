@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SkinCoverage } from "@look-studio/shared";
 import type { LookSpec } from "@look-studio/shared";
 import {
   listVideoDevices,
@@ -15,6 +14,7 @@ import type { TrackerReadout } from "../tracking/use-face-tracker.ts";
 import { useAvatarView } from "../scene/use-avatar-view.ts";
 import { useLookScene } from "../scene/use-look-scene.ts";
 import { wearableLayout } from "../scene/wearable-layout.ts";
+import SkinControls, { useSkinSettings } from "./SkinControls.tsx";
 import Window from "./Window.tsx";
 
 interface CameraPreviewProps {
@@ -28,13 +28,10 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
   const [plain, setPlain] = useState(false);
+  const skinSettings = useSkinSettings(look);
   const [wobble, setWobble] = useState(true);
   const [avatarOn, setAvatarOn] = useState(false);
   const avatar = useAvatarView(avatarModel);
-  const [touchUp, setTouchUp] = useState(0);
-  const [coverage, setCoverage] = useState<SkinCoverage>("none");
-  const lookId = look?.id;
-  const lookSkin = look?.makeup?.skin;
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -59,16 +56,6 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
   useEffect(() => {
     setAvatarOn(avatarModel !== null);
   }, [avatarModel]);
-
-  useEffect(() => {
-    if (lookSkin !== undefined) {
-      setTouchUp(Math.round(lookSkin.smoothing * 100));
-      setCoverage(lookSkin.coverage ?? "none");
-    }
-  }, [lookId, lookSkin]);
-
-  const finish = lookSkin?.finish ?? "natural";
-  const skin = useMemo(() => ({ smoothing: touchUp / 100, coverage, finish }), [touchUp, coverage, finish]);
 
   const refreshDevices = async () => {
     try {
@@ -130,7 +117,7 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
   const { headRef, readout } = useFaceTracker(videoRef, showing);
   const wearables = useMemo(() => wearableLayout(look), [look]);
   const avatarView = avatarOn && avatar.status === "ready" ? avatar.view : null;
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, plain, wearables, skin, wobble, avatarView);
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, look?.grooming, plain, wearables, skinSettings.skin, wobble, avatarView);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -219,28 +206,7 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
             />
           </label>
         </div>
-        <div className="player__touchup">
-          <label htmlFor="touch-up">✨ Touch-up</label>
-          <input
-            id="touch-up"
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={touchUp}
-            aria-valuetext={touchUp === 0 ? "off" : `${touchUp}%`}
-            onChange={(event) => setTouchUp(Number(event.target.value))}
-          />
-          <output htmlFor="touch-up">{touchUp === 0 ? "off" : `${touchUp}%`}</output>
-          <label htmlFor="coverage">Coverage</label>
-          <select id="coverage" value={coverage} onChange={(event) => setCoverage(SkinCoverage.parse(event.target.value))}>
-            {SkinCoverage.options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SkinControls settings={skinSettings} />
         <div className="player__source">
           <label htmlFor="camera-device">Source</label>
           <select id="camera-device" value={deviceId} onChange={(event) => setDeviceId(event.target.value)}>

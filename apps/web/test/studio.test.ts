@@ -66,7 +66,7 @@ describe("api client", () => {
     expect(badLook).toEqual({ ok: false, error: "bad_response", retryAfterS: null });
     const badMeta = await requestEdit(
       { utterance: "x", look },
-      { signal, fetchFn: respond(200, { ok: true, command: { op: "toggle", targetId: "w1" }, meta: { model: 1 } }) },
+      { signal, fetchFn: respond(200, { ok: true, edits: { commands: [{ op: "toggle", targetId: "w1" }], skipped: 0 }, meta: { model: 1 } }) },
     );
     expect(badMeta.ok).toBe(false);
   });
@@ -113,7 +113,9 @@ describe("look edits", () => {
       y: 0.2,
       z: 0,
     });
-    expect(applyEdit(look, { op: "recolor", targetId: "w1", color: "#ff0000" }).palette).toEqual(["#ff0000", "#FFD700"]);
+    const recolored = applyEdit(look, { op: "recolor", targetId: "w1", color: "#ff0000" });
+    expect(recolored.wearables[0]?.color).toBe("#ff0000");
+    expect(recolored.palette).toEqual(["#FFD700"]);
     const added = applyEdit(look, {
       op: "add",
       targetId: "w2",
@@ -161,7 +163,7 @@ describe("studio state", () => {
     state = studioReducer(state, { type: "sent", at: "9:00", call: "look", text: "gold" });
     expect(state.pending).toBe(true);
     state = studioReducer(state, { type: "look-received", at: "9:01", look, meta });
-    state = studioReducer(state, { type: "edit-received", at: "9:02", command: { op: "toggle", targetId: "w1" }, meta });
+    state = studioReducer(state, { type: "edit-received", at: "9:02", edits: { commands: [{ op: "toggle", targetId: "w1" }], skipped: 0 }, meta });
     state = studioReducer(state, { type: "failed", at: "9:03", call: "edit", error: "network", message: "offline" });
     expect(state.pending).toBe(false);
     expect(state.look?.wearables[0].visible).toBe(false);

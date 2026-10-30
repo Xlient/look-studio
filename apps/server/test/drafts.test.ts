@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { LookSpec } from "@look-studio/shared";
-import { buildEditPrompt, draftToEditCommand } from "../src/lib/edit-draft.ts";
+import { buildEditPrompt, draftToEditCommand, draftsToEditBatch } from "../src/lib/edit-draft.ts";
 import type { EditDraft } from "../src/lib/edit-draft.ts";
+import { MAX_EDITS } from "@look-studio/shared";
 import {
   buildLookPrompt,
   DraftMakeup,
@@ -33,6 +34,15 @@ const draft: LookDraft = {
     skinSmoothing: 0,
     skinCoverage: "none",
     skinFinish: "natural",
+  },
+  grooming: {
+    facialHairStyle: "none",
+    facialHairLength: 0,
+    facialHairDensity: 0,
+    facialHairColor: "",
+    facialHairGrey: 0,
+    browShape: "natural",
+    shadowCover: 0,
   },
 };
 
@@ -139,7 +149,7 @@ describe("look drafts", () => {
 
 describe("edit drafts", () => {
   it("lists current wearables in the prompt", () => {
-    expect(buildEditPrompt("make it red", look)).toContain("look-1-w1: Crown (hat, head)");
+    expect(buildEditPrompt("make it red", look)).toContain("look-1-w1: Crown (hat, head, colour default)");
   });
 
   it("resolves each op against the current look", () => {
@@ -198,6 +208,28 @@ describe("edit drafts", () => {
       targetId: "blush",
       opacity: 0,
     });
+  });
+
+  it("caps a batch at the edit limit and needs one edit to resolve", () => {
+    const many = Array.from({ length: MAX_EDITS + 3 }, () => edit({ op: "toggle" }));
+    expect(draftsToEditBatch(many, look, () => "n")).toMatchObject({ skipped: 0 });
+    expect(draftsToEditBatch(many, look, () => "n")?.commands).toHaveLength(MAX_EDITS);
+    expect(draftsToEditBatch([edit({ targetId: "missing" })], look, () => "n")).toBeNull();
+    expect(draftsToEditBatch([], look, () => "n")).toBeNull();
+  });
+
+  it("gives each added wearable its own id", () => {
+    const add = edit({ op: "add", targetId: "new", wearable: { type: "hat", label: "Cap", region: "head" } });
+    let next = 0;
+    const batch = draftsToEditBatch([add, add], look, () => `id-${(next += 1)}`);
+    expect(batch?.commands.map((command) => command.targetId)).toEqual(["id-1", "id-2"]);
+  });
+
+  it("tells the model to keep every change and separates wearables from makeup", () => {
+    const prompt = buildEditPrompt("x", { ...look, wearables: [{ id: "w", type: "glasses", label: "Specs", anchor: { region: "face" }, color: "#FFFFFF" }] });
+    expect(prompt).toContain("colour #FFFFFF");
+    expect(prompt).toContain("Make one edit for every change requested");
+    expect(prompt).toContain("never op makeup");
   });
 
   it("rejects makeup edits without an area or a change", () => {

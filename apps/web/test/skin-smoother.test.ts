@@ -3,6 +3,7 @@ import { createMakeupGeometry } from "../src/scene/makeup-regions.ts";
 import type { MakeupGeometry, Polygon } from "../src/scene/makeup-regions.ts";
 import {
   NO_SKIN,
+  coverAlpha,
   coverageAlpha,
   createSkinSmoother,
   meanShade,
@@ -139,6 +140,36 @@ describe("createSkinSmoother", () => {
     smoother.apply(recordingTarget(log), {} as CanvasImageSource, createMakeupGeometry(), skin({ coverage: "light" }), 640, 480);
     smoother.apply(recordingTarget(log), {} as CanvasImageSource, trackedFace(), skin({ coverage: "light" }), 640, 480);
     expect(sampled()).toBe(3);
+  });
+
+  it("covers stubble with the user's own shade, sampled from the upper face", () => {
+    const log: string[] = [];
+    const sampleArgs: unknown[][] = [];
+    const layers = [recordingLayer(log, "mask"), recordingLayer(log, "work"), recordingLayer(log, "sample", SKIN_PIXELS)];
+    const sample = layers[2];
+    const smoother = createSkinSmoother(() => layers.shift() ?? null);
+    if (sample !== undefined) {
+      const draw = sample.ctx.drawImage.bind(sample.ctx);
+      sample.ctx.drawImage = ((...args: unknown[]) => {
+        sampleArgs.push(args);
+        return (draw as (...a: unknown[]) => void)(...args);
+      }) as typeof sample.ctx.drawImage;
+    }
+    smoother.apply(recordingTarget(log), {} as CanvasImageSource, trackedFace(), skin({ cover: 1 }), 640, 480);
+    expect(log.filter((line) => line.startsWith("work:fill") || line.startsWith("target"))).toEqual([
+      "work:fill:source-over:blur(5px)",
+      "work:fill:destination-out:blur(1.5px)",
+      `target:source-over:${coverAlpha(1).toFixed(2)}`,
+    ]);
+    const faceHeight = 260 + 2 * 30;
+    expect(sampleArgs[0]?.[4]).toBeCloseTo(faceHeight * 0.55);
+  });
+
+  it("clamps the cover mix", () => {
+    expect(coverAlpha(0)).toBe(0);
+    expect(coverAlpha(Number.NaN)).toBe(0);
+    expect(coverAlpha(5)).toBe(coverAlpha(1));
+    expect(coverAlpha(1)).toBeLessThan(0.6);
   });
 
   it("skips the foundation when no skin pixels are found", () => {

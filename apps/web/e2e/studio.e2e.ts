@@ -7,6 +7,7 @@ const LOOK = {
   style: "casual",
   palette: ["#FF6F61"],
   makeup: { lips: { color: "#FF6F61", opacity: 0.8, finish: "gloss" }, skin: { smoothing: 0.4, coverage: "light", finish: "dewy" } },
+  grooming: { facialHair: { style: "stubble", length: 0, density: 0.6, color: "#2b1d14", grey: 0 }, shadowCover: 0.4 },
   wearables: [{ id: "look-e2e-w1", type: "hat", label: "Crown", anchor: { region: "head" }, visible: true }],
 };
 
@@ -109,6 +110,34 @@ test("a chat request logs the Muse call and shows the look", async ({ page }) =>
   await expect(page.locator(".player__ticker")).toContainText(`NOW WEARING: ${LOOK.name}`);
 });
 
+test("one message can revise makeup and a wearable together, and undo takes it all back", async ({ page }) => {
+  await page.route("**/api/edit", (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        meta: META,
+        edits: {
+          commands: [
+            { op: "makeup", targetId: "lips", color: "#C76B6B", opacity: 0.45 },
+            { op: "recolor", targetId: "look-e2e-w1", color: "#FFFFFF" },
+          ],
+          skipped: 0,
+        },
+      },
+    }),
+  );
+  await enterStudio(page);
+  await page.getByLabel("Message LookArtist").fill("Heart shades + coral lips");
+  await page.getByRole("button", { name: /Send/ }).click();
+  const log = page.getByRole("log", { name: "Conversation" });
+  await expect(log).toContainText(LOOK.name);
+  await page.getByLabel("Message LookArtist").fill("subtler lipstick and make the crown white");
+  await page.getByRole("button", { name: /Send/ }).click();
+  await expect(log).toContainText("Changed lips to #C76B6B. Switched Crown to #FFFFFF.");
+  await page.getByRole("button", { name: /Undo/ }).click();
+  await expect(page.getByRole("button", { name: /Redo/ })).toBeEnabled();
+});
+
 test("the touch-up slider follows the look and works from the keyboard", async ({ page }) => {
   await enterStudio(page);
   const slider = page.getByRole("slider", { name: /Touch-up/ });
@@ -117,6 +146,8 @@ test("the touch-up slider follows the look and works from the keyboard", async (
   await page.getByRole("button", { name: /Send/ }).click();
   await expect(slider).toHaveValue("40");
   await expect(page.getByLabel("Coverage")).toHaveValue("light");
+  await expect(page.getByRole("slider", { name: "Stubble cover" })).toHaveValue("40");
+  await expect(page.getByRole("button", { name: "Weekend stubble" })).toBeVisible();
   await page.getByLabel("Coverage").selectOption("full");
   await expect(page.getByLabel("Coverage")).toHaveValue("full");
   await slider.focus();

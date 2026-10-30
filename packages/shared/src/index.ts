@@ -1,12 +1,25 @@
 export { CritiqueIssue, CritiqueReport, CritiqueSeverity } from "./schemas/critique-report.ts";
-export { EditCommand, EditOp, MakeupArea } from "./schemas/edit-command.ts";
+export { EditBatch, EditCommand, EditOp, MAX_EDITS, MakeupArea } from "./schemas/edit-command.ts";
 export {
   CritiqueReportJsonSchema,
   EditCommandJsonSchema,
   LookSpecJsonSchema,
   WearableSpecJsonSchema,
 } from "./json-schema.ts";
-export { HexColor, LipFinish, LookSpec, LookStyle, Makeup, ShadowFinish, SkinCoverage, SkinFinish } from "./schemas/look-spec.ts";
+export {
+  BrowShape,
+  FacialHair,
+  FacialHairStyle,
+  Grooming,
+  HexColor,
+  LipFinish,
+  LookSpec,
+  LookStyle,
+  Makeup,
+  ShadowFinish,
+  SkinCoverage,
+  SkinFinish,
+} from "./schemas/look-spec.ts";
 export {
   AnchorRegion,
   Offset3D,
