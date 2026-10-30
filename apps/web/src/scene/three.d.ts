@@ -7,11 +7,17 @@ declare module "three" {
     x: number;
     y: number;
     z: number;
+    constructor(x?: number, y?: number, z?: number);
     set(x: number, y: number, z: number): this;
   }
 
   export class Quaternion {
     setFromRotationMatrix(m: Matrix4): this;
+    setFromEuler(euler: Euler): this;
+    copy(quaternion: Quaternion): this;
+    clone(): Quaternion;
+    invert(): this;
+    multiply(quaternion: Quaternion): this;
   }
 
   export class Matrix4 {
@@ -23,6 +29,16 @@ declare module "three" {
     x: number;
     y: number;
     z: number;
+    set(x: number, y: number, z: number, order?: string): this;
+  }
+
+  export class Box3 {
+    readonly min: Vector3;
+    readonly max: Vector3;
+    setFromObject(object: Object3D): this;
+    isEmpty(): boolean;
+    getSize(target: Vector3): Vector3;
+    getCenter(target: Vector3): Vector3;
   }
 
   export class Object3D {
@@ -30,14 +46,24 @@ declare module "three" {
     readonly rotation: Euler;
     readonly scale: Vector3;
     readonly quaternion: Quaternion;
+    readonly name: string;
+    readonly parent: Object3D | null;
     visible: boolean;
     renderOrder: number;
+    frustumCulled: boolean;
     add(...objects: Object3D[]): this;
+    lookAt(x: number, y: number, z: number): void;
+    getWorldPosition(target: Vector3): Vector3;
+    getWorldQuaternion(target: Quaternion): Quaternion;
+    updateMatrixWorld(force?: boolean): void;
     traverse(callback: (object: Object3D) => void): void;
   }
 
   export class Group extends Object3D {}
-  export class Scene extends Object3D {}
+  export class Scene extends Object3D {
+    background: Color | null;
+  }
+  export class Bone extends Object3D {}
 
   export class BufferGeometry {
     dispose(): void;
@@ -62,6 +88,7 @@ declare module "three" {
   }
 
   export class Color {
+    constructor(hex?: number);
     setHex(hex: number): this;
   }
 
@@ -118,6 +145,14 @@ declare module "three" {
     bottom: number;
     updateProjectionMatrix(): void;
   }
+  export class PerspectiveCamera extends Camera {
+    constructor(fov?: number, aspect?: number, near?: number, far?: number);
+    fov: number;
+    aspect: number;
+    near: number;
+    far: number;
+    updateProjectionMatrix(): void;
+  }
 
   export interface WebGLRendererParameters {
     canvas?: HTMLCanvasElement;
@@ -133,5 +168,16 @@ declare module "three" {
     setSize(width: number, height: number, updateStyle?: boolean): void;
     render(scene: Object3D, camera: Camera): void;
     dispose(): void;
+  }
+}
+
+declare module "three/addons/loaders/GLTFLoader.js" {
+  import type { Group } from "three";
+
+  export interface GLTF {
+    scene: Group;
+  }
+  export class GLTFLoader {
+    parseAsync(data: ArrayBuffer, path: string): Promise<GLTF>;
   }
 }

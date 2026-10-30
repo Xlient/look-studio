@@ -11,18 +11,27 @@ import {
 import type { CameraStatus, VideoDevice } from "../tracking/camera.ts";
 import { useFaceTracker } from "../tracking/use-face-tracker.ts";
 import type { TrackerReadout } from "../tracking/use-face-tracker.ts";
+import { useAvatarView } from "../scene/use-avatar-view.ts";
 import { useLookScene } from "../scene/use-look-scene.ts";
 import { wearableLayout } from "../scene/wearable-layout.ts";
 import SkinControls, { useSkinSettings } from "./SkinControls.tsx";
 import Window from "./Window.tsx";
 
-export default function CameraPreview({ look, thinking }: { look: LookSpec | null; thinking: string | null }) {
+interface CameraPreviewProps {
+  look: LookSpec | null;
+  thinking: string | null;
+  avatarModel: ArrayBuffer | null;
+}
+
+export default function CameraPreview({ look, thinking, avatarModel }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mirror, setMirror] = useState(true);
   const [plain, setPlain] = useState(false);
   const skinSettings = useSkinSettings(look);
   const [wobble, setWobble] = useState(true);
+  const [avatarOn, setAvatarOn] = useState(false);
+  const avatar = useAvatarView(avatarModel);
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>("prompt");
   const [devices, setDevices] = useState<VideoDevice[]>([]);
@@ -43,6 +52,10 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
       return () => URL.revokeObjectURL(sampleUrl);
     }
   }, [sampleUrl]);
+
+  useEffect(() => {
+    setAvatarOn(avatarModel !== null);
+  }, [avatarModel]);
 
   const refreshDevices = async () => {
     try {
@@ -103,7 +116,8 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
   const showing = status === "live" || status === "sample";
   const { headRef, readout } = useFaceTracker(videoRef, showing);
   const wearables = useMemo(() => wearableLayout(look), [look]);
-  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, look?.grooming, plain, wearables, skinSettings.skin, wobble);
+  const avatarView = avatarOn && avatar.status === "ready" ? avatar.view : null;
+  useLookScene({ canvasRef, videoRef, headRef }, showing, mirror, look?.makeup, look?.grooming, plain, wearables, skinSettings.skin, wobble, avatarView);
 
   return (
     <Window id="camera" title="LookCam Player 2000" icon="◉" flavor="blueberry" className="win--camera">
@@ -130,7 +144,7 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
               <span className="player__thinking-spark">✦</span> {thinking}…
             </div>
           )}
-          {look !== null && showing && !plain && (
+          {look !== null && showing && !plain && avatarView === null && (
             <div className="player__ticker" aria-hidden="true">
               <span>
                 NOW WEARING: {look.name}
@@ -168,6 +182,17 @@ export default function CameraPreview({ look, thinking }: { look: LookSpec | nul
           <button type="button" className="btn" aria-pressed={wobble} onClick={() => setWobble((value) => !value)}>
             〰 Wobble
           </button>
+          {avatarModel !== null && (
+            <button
+              type="button"
+              className="btn"
+              aria-pressed={avatarOn}
+              disabled={avatar.status !== "ready"}
+              onClick={() => setAvatarOn((value) => !value)}
+            >
+              🧸 {avatar.status === "loading" ? "Loading avatar…" : avatar.status === "error" ? "Avatar failed to load" : "Avatar mode"}
+            </button>
+          )}
           <label className="btn btn--file">
             Sample video
             <input

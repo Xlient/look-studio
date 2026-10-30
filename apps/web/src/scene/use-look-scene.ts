@@ -2,7 +2,9 @@ import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { Grooming, Makeup } from "@look-studio/shared";
 import type { HeadState } from "../tracking/head-state.ts";
-import { createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
+import { createAvatarMotion, headAngles, stepAvatarMotion } from "./avatar-rig.ts";
+import type { AvatarView } from "./avatar-view.ts";
+import { MIN_CONFIDENCE, createFrameGate, createHeadAnchor, writeHeadAnchor } from "./head-anchor.ts";
 import type { Viewport } from "./head-anchor.ts";
 import { createLookScene } from "./look-scene.ts";
 import type { WearableLayout } from "./wearable-layout.ts";
@@ -42,6 +44,7 @@ export function useLookScene(
   wearables: WearableLayout,
   skin: SkinRender,
   wobbleOn: boolean,
+  avatar: AvatarView | null,
 ) {
   const sceneRef = useRef<LookScene | null>(null);
   const viewRef = useRef<Viewport>({ width: 0, height: 0, mirror });
@@ -54,6 +57,12 @@ export function useLookScene(
   const wobbleOnRef = useRef(wobbleOn);
   wobbleOnRef.current = wobbleOn;
   const wearablesRef = useRef(wearables);
+  const avatarRef = useRef(avatar);
+
+  useEffect(() => {
+    avatarRef.current = avatar;
+    sceneRef.current?.setAvatar(avatar);
+  }, [avatar]);
 
   useEffect(() => {
     wearablesRef.current = wearables;
@@ -85,10 +94,13 @@ export function useLookScene(
     sceneRef.current = scene;
     scene.setMirror(viewRef.current.mirror);
     scene.setWearables(wearablesRef.current);
+    scene.setAvatar(avatarRef.current);
     const anchor = createHeadAnchor();
     const gate = createFrameGate(OUTPUT_FPS);
     const view = viewRef.current;
     const wobble = createWobble();
+    const motion = createAvatarMotion();
+    const angles = { yaw: 0, pitch: 0, roll: 0 };
     let lastMs = Number.NaN;
     let handle = 0;
 
@@ -105,6 +117,15 @@ export function useLookScene(
         scene.resize(view.width, view.height);
       }
       const head = headRef.current;
+      const avatarFrame = avatarRef.current;
+      if (avatarFrame !== null) {
+        const tracked = head !== null && head.confidence >= MIN_CONFIDENCE;
+        stepAvatarMotion(motion, tracked ? headAngles(angles, head.pose, view.mirror) : null, (tMs - lastMs) / 1000);
+        lastMs = tMs;
+        avatarFrame.pose(motion, tMs / 1000);
+        scene.render(anchor, wobble);
+        return;
+      }
       const plainFrame = plainRef.current;
       const passes = plainFrame ? NO_PASSES : passesRef.current;
       const skinFrame = plainFrame ? NO_SKIN : skinRef.current;

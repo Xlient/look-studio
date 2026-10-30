@@ -13,6 +13,7 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from "three";
+import type { AvatarView } from "./avatar-view.ts";
 import type { HeadAnchor } from "./head-anchor.ts";
 import { EMPTY_LAYOUT } from "./wearable-layout.ts";
 import type { WearableLayout, WearableSlot } from "./wearable-layout.ts";
@@ -24,6 +25,7 @@ export interface LookScene {
   resize(width: number, height: number): void;
   setMirror(mirror: boolean): void;
   setWearables(layout: WearableLayout): void;
+  setAvatar(view: AvatarView | null): void;
   render(anchor: HeadAnchor, wobble: Wobble): void;
   dispose(): void;
 }
@@ -85,9 +87,13 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
   const rotation = new Matrix4();
   let mirror = true;
   let width = 1;
+  let height = 1;
+  let avatar: AvatarView | null = null;
 
   const resize = (w: number, h: number) => {
     width = w;
+    height = h;
+    avatar?.resize(w, h);
     renderer.setSize(w, h, false);
     camera.left = -w / 2;
     camera.right = w / 2;
@@ -104,7 +110,15 @@ export function createLookScene(canvas: HTMLCanvasElement, backdropSource: HTMLC
       backdrop.scale.set(mirror ? -width : width, backdrop.scale.y, 1);
     },
     setWearables,
+    setAvatar(view) {
+      avatar = view;
+      avatar?.resize(width, height);
+    },
     render(anchor, wobble) {
+      if (avatar !== null) {
+        renderer.render(avatar.scene, avatar.camera);
+        return;
+      }
       texture.needsUpdate = true;
       headPivot.visible = anchor.visible;
       eyesPivot.visible = anchor.visible;

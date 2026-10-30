@@ -64,11 +64,11 @@ function retryAfterSeconds(response: Response): number | null {
   return response.headers.has("retry-after") && Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
-function resolveFetch(options: RequestOptions): FetchLike {
+export function resolveFetch(options: RequestOptions): FetchLike {
   return options.fetchFn ?? ((input: string, init: RequestInit) => fetch(input, init));
 }
 
-function transportFailure(timeout: AbortSignal, signal: AbortSignal): ApiFailure {
+export function transportFailure(timeout: AbortSignal, signal: AbortSignal): ApiFailure {
   return { ok: false, error: timeout.aborted ? "timeout" : signal.aborted ? "aborted" : "network", retryAfterS: null };
 }
 
@@ -80,13 +80,13 @@ function parseJson(text: string): unknown {
   }
 }
 
-async function failureFrom(response: Response): Promise<ApiFailure> {
+export async function failureFrom(response: Response): Promise<ApiFailure> {
   const payload = parseJson(await response.text().catch(() => ""));
   const error = isRecord(payload) && typeof payload["error"] === "string" ? payload["error"] : "bad_response";
   return { ok: false, error, retryAfterS: retryAfterSeconds(response) };
 }
 
-async function postForPayload(
+export async function postForPayload(
   path: string,
   body: unknown,
   options: RequestOptions,
@@ -253,6 +253,20 @@ export function errorMessage(error: string, retryAfterS: number | null): string 
       return "Look Studio always keeps your own skin tone, so I can't change skin colour. Try a makeup or style idea instead.";
     case "body_too_large":
       return "That photo is too large. Try one under 3 MB.";
+    case "avatar_blocked":
+      return "That character can't be made here. Try a different description.";
+    case "avatar_daily_limit":
+      return retryAfterS === null
+        ? "You've used today's avatar builds. Try again tomorrow."
+        : `You've used today's avatar builds. Try again in ${Math.ceil(retryAfterS / 3600)}h.`;
+    case "concept_not_found":
+    case "job_not_found":
+      return "That avatar expired on the server. Draw new concepts to start again.";
+    case "model_unavailable":
+    case "model_not_ready":
+      return "The finished avatar couldn't be downloaded. Try building it again.";
+    case "avatar_failed":
+      return "The 3D build didn't work. Try a different concept.";
     case "aborted":
       return "Request cancelled.";
     case "network":
