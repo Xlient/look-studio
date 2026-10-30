@@ -80,7 +80,7 @@ describe("createFpsCounter", () => {
 describe("createFaceTracker", () => {
   const setup = (overrides: { detect?: () => FaceSample; filter?: boolean } = {}) => {
     const video: VideoFrameSource = { currentTime: 0, readyState: 4 };
-    const frames: { confidence: number; pose0: number; fps: number }[] = [];
+    const frames: { confidence: number; pose0: number; landmark0: number; fps: number }[] = [];
     const errors: unknown[] = [];
     const { scheduler, flush, pending } = manualScheduler();
     let clock = 0;
@@ -99,7 +99,12 @@ describe("createFaceTracker", () => {
         overrides.filter === true
           ? { filter: (sample: Float32Array) => sample.map((value) => value * 2) }
           : undefined,
-      onFrame: (state: HeadState, fps: number) => frames.push({ confidence: state.confidence, pose0: state.pose[1] ?? 0, fps }),
+      landmarkFilter:
+        overrides.filter === true
+          ? { filter: (sample: Float32Array) => sample.map((value) => value / 2) }
+          : undefined,
+      onFrame: (state: HeadState, fps: number) =>
+        frames.push({ confidence: state.confidence, pose0: state.pose[1] ?? 0, landmark0: state.landmarks[0] ?? 0, fps }),
       onError: (error) => errors.push(error),
     });
     const advance = (t: number) => {
@@ -142,6 +147,17 @@ describe("createFaceTracker", () => {
     tracker.start();
     advance(33);
     expect(frames[0]?.pose0).toBe(2);
+  });
+
+  it("applies the landmark filter only when a face is present", () => {
+    const found = setup({ filter: true });
+    found.tracker.start();
+    found.advance(33);
+    expect(found.frames[0]?.landmark0).toBeCloseTo(0.25);
+    const lost = setup({ filter: true, detect: () => ({ faceLandmarks: [] }) });
+    lost.tracker.start();
+    lost.advance(33);
+    expect(lost.frames[0]?.landmark0).toBe(0);
   });
 
   it("stops scheduling after stop", () => {
