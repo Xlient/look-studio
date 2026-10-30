@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.ts";
 import { createContainer } from "../src/container.ts";
 import { FakeAvatarCheckService, MuseAvatarCheckService } from "../src/lib/avatar-check.ts";
@@ -7,7 +7,14 @@ import { defaultRetryPolicy } from "../src/lib/model-client.ts";
 import { InMemoryRateLimiter, resetRateLimiter } from "../src/lib/rate-limit.ts";
 import { resetSpendLedger } from "../src/lib/spend-cap.ts";
 
+const savedEnv = { ...process.env };
+
+beforeEach(() => {
+  process.env.MODEL_API_KEY = "test-key-avatar-check";
+});
+
 afterEach(() => {
+  process.env = { ...savedEnv };
   resetRateLimiter();
   resetSpendLedger();
 });
