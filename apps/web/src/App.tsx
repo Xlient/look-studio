@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AvatarWindow from "./components/AvatarWindow.tsx";
 import BuddyChat from "./components/BuddyChat.tsx";
 import CameraPreview from "./components/CameraPreview.tsx";
 import LibraryWindow from "./components/LibraryWindow.tsx";
@@ -35,6 +36,7 @@ function Studio() {
   const current = state.look;
   const jobs = useWearableJobs(state.look);
   const summary = summarizeMonitor(state.monitor);
+  const [avatarModel, setAvatarModel] = useState<ArrayBuffer | null>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -59,7 +61,7 @@ function Studio() {
     <div className="desktop">
       <h1 className="sr-only">Look Studio</h1>
       <main className="desktop__grid">
-        <CameraPreview look={state.look} thinking={thinking === null ? null : thinkingTitle(thinking.call)} />
+        <CameraPreview look={state.look} thinking={thinking === null ? null : thinkingTitle(thinking.call)} avatarModel={avatarModel} />
         <BuddyChat
           messages={state.messages}
           pending={state.pending}
@@ -89,6 +91,7 @@ function Studio() {
           onExport={library.exportJson}
           onImport={library.importJson}
         />
+        <AvatarWindow onModel={setAvatarModel} />
         <ModelMonitor entries={state.monitor} />
       </main>
       <Taskbar />
