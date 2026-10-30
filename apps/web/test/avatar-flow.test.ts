@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AvatarConcept } from "@look-studio/shared";
-import { INITIAL_FLOW, avatarFlowReducer, buildingLabel } from "../src/studio/avatar-flow.ts";
+import { INITIAL_FLOW, avatarFlowReducer, buildingLabel, failureText, loadFailureMessage } from "../src/studio/avatar-flow.ts";
 import type { AvatarFlow, AvatarFlowEvent } from "../src/studio/avatar-flow.ts";
 
 const CONCEPTS: AvatarConcept[] = ["a", "b", "c"].map((id) => ({ id, image: "data:image/png;base64,AA==" }));
@@ -51,6 +51,21 @@ describe("avatarFlowReducer", () => {
     expect(run([{ type: "draw" }, { type: "fail", message: "blocked" }])).toEqual({ step: "describe", error: "blocked" });
     const failed = run([...toConfirm, { type: "build" }, { type: "started", jobId: "job-1" }, { type: "fail", message: "broke" }]);
     expect(failed).toEqual({ step: "describe", error: "broke" });
+  });
+
+  it("keeps the job after a failed download so it can be retried", () => {
+    const started: AvatarFlowEvent[] = [...toConfirm, { type: "build" }, { type: "started", jobId: "job-1" }];
+    const failed = run([...started, { type: "download-failed", message: "cut off" }]);
+    expect(failed).toEqual({ step: "download-failed", concepts: CONCEPTS, concept: CONCEPTS[1], jobId: "job-1", error: "cut off" });
+    expect(avatarFlowReducer(failed, { type: "retry-download" })).toMatchObject({ step: "building", jobId: "job-1", stage: "ready", progress: 100 });
+    expect(run([...toConfirm, { type: "download-failed", message: "cut off" }])).toMatchObject({ step: "confirm" });
+  });
+
+  it("includes a bounded reason in failure text", () => {
+    expect(failureText("Failed.", undefined)).toBe("Failed.");
+    expect(failureText("Failed.", "x".repeat(500))).toHaveLength("Failed. ()".length + 200);
+    expect(loadFailureMessage(new Error("No DRACOLoader instance provided."))).toBe("Avatar failed to load. (No DRACOLoader instance provided.)");
+    expect(loadFailureMessage("odd")).toBe("Avatar failed to load.");
   });
 
   it("resets from any step", () => {

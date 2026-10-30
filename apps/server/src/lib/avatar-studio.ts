@@ -12,6 +12,8 @@ const CONCEPT_TTL_MS = 30 * 60_000;
 const MAX_CONCEPTS = 60;
 const JOB_TIMEOUT_MS = 20 * 60_000;
 const JOB_TTL_MS = 60 * 60_000;
+const MODEL_RETAIN_MS = 15 * 60_000;
+const MAX_HELD_MODELS = 5;
 const MODELING_SHARE = 0.75;
 
 export class AvatarBlockedError extends Error {
@@ -65,6 +67,7 @@ interface AvatarJob {
   createdAt: number;
   status: AvatarJobStatus;
   build: AvatarBuild | null;
+  model: { bytes: ArrayBuffer; expiresAt: number } | null;
   listeners: Set<(status: AvatarJobStatus) => void>;
 }
 
@@ -86,6 +89,9 @@ export interface AvatarService {
   subscribe(jobId: string, emit: (status: AvatarJobStatus) => Promise<void>, signal: AbortSignal): Promise<void>;
   fetchModel(jobId: string, owner: string, signal: AbortSignal): Promise<Response | null>;
 }
+
+const modelResponse = (bytes: ArrayBuffer) =>
+  new Response(bytes, { headers: { "content-type": "model/gltf-binary", "cache-control": "no-store" } });
 
 const isTerminal = (status: AvatarJobStatus) => status.stage === "ready" || status.stage === "failed";
 
@@ -111,6 +117,12 @@ export class AvatarStudio implements AvatarService {
         void job.build?.cleanup(AbortSignal.timeout(10_000));
       }
     }
+    const held = [...this.jobs].filter(([, job]) => job.model !== null);
+    held.forEach(([id, job], index) => {
+      if ((job.model?.expiresAt ?? now) <= now || index < held.length - MAX_HELD_MODELS) {
+        this.jobs.delete(id);
+      }
+    });
     while (this.concepts.size > MAX_CONCEPTS) {
       const oldest = this.concepts.keys().next().value;
       if (oldest === undefined) {
@@ -155,6 +167,7 @@ export class AvatarStudio implements AvatarService {
       createdAt: this.deps.now(),
       status: { jobId, stage: "queued", progress: 0 },
       build: null,
+      model: null,
       listeners: new Set(),
     };
     this.jobs.set(jobId, job);
@@ -213,9 +226,16 @@ export class AvatarStudio implements AvatarService {
   }
 
   async fetchModel(jobId: string, owner: string, signal: AbortSignal): Promise<Response | null> {
+    this.prune();
     const job = this.jobs.get(jobId);
-    const build = job?.build ?? null;
-    if (job === undefined || job.owner !== owner || build === null) {
+    if (job === undefined || job.owner !== owner) {
+      return null;
+    }
+    if (job.model !== null) {
+      return modelResponse(job.model.bytes);
+    }
+    const build = job.build;
+    if (build === null) {
       return null;
     }
     const response = await (this.deps.fetch ?? fetch)(build.glbUrl, { signal });
@@ -224,8 +244,10 @@ export class AvatarStudio implements AvatarService {
     }
     const bytes = await response.arrayBuffer();
     job.build = null;
-    this.jobs.delete(jobId);
+    // Meshy's copy is deleted next, so a browser that loses this download can only retry from here.
+    job.model = { bytes, expiresAt: this.deps.now() + MODEL_RETAIN_MS };
+    this.prune();
     await build.cleanup(AbortSignal.timeout(10_000));
-    return new Response(bytes, { headers: { "content-type": "model/gltf-binary", "cache-control": "no-store" } });
+    return modelResponse(bytes);
   }
 }

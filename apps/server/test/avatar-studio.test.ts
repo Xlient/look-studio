@@ -184,6 +184,42 @@ describe("AvatarStudio", () => {
     expect(model?.headers.get("content-type")).toBe("model/gltf-binary");
     expect(new Uint8Array(await (model ?? new Response()).arrayBuffer()).slice(0, 4)).toEqual(new TextEncoder().encode("glTF"));
     expect(run.cleaned).toEqual(["cleaned"]);
+    expect(service.getJob(jobId, client.key)).toMatchObject({ stage: "ready" });
+  });
+
+  it("serves a downloaded model again from memory, without another Meshy fetch or cleanup", async () => {
+    const run = deferredProvider();
+    let fetches = 0;
+    const { service } = studio({
+      provider: run.provider,
+      fetch: async () => {
+        fetches += 1;
+        return new Response(new Uint8Array([1, 2, 3]));
+      },
+    });
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    run.succeed();
+    await flush();
+    await service.fetchModel(jobId, client.key, signal());
+    const again = await service.fetchModel(jobId, client.key, signal());
+    expect(new Uint8Array(await (again ?? new Response()).arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(fetches).toBe(1);
+    expect(run.cleaned).toEqual(["cleaned"]);
+    expect(await service.fetchModel(jobId, "203.0.113.99", signal())).toBeNull();
+  });
+
+  it("forgets a downloaded model once its retry window ends", async () => {
+    const run = deferredProvider();
+    const clock = { t: 0 };
+    const { service } = studio({ provider: run.provider }, clock);
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    run.succeed();
+    await flush();
+    expect(await service.fetchModel(jobId, client.key, signal())).not.toBeNull();
+    clock.t = 15 * 60_000;
+    expect(await service.fetchModel(jobId, client.key, signal())).toBeNull();
     expect(service.getJob(jobId, client.key)).toBeNull();
   });
 

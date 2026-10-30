@@ -73,9 +73,11 @@ export async function downloadAvatarModel(jobId: string, options: RequestOptions
   }
   try {
     const model = await response.arrayBuffer();
-    return model.byteLength > 0 && model.byteLength <= MAX_MODEL_BYTES ? { ok: true, model } : BAD_RESPONSE;
-  } catch {
-    return BAD_RESPONSE;
+    return model.byteLength > 0 && model.byteLength <= MAX_MODEL_BYTES
+      ? { ok: true, model }
+      : { ok: false, error: "model_read_failed", retryAfterS: null, detail: `received ${model.byteLength} bytes` };
+  } catch (error) {
+    return { ok: false, error: "model_read_failed", retryAfterS: null, detail: error instanceof Error ? error.message : "unknown error" };
   }
 }
 

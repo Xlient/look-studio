@@ -9,6 +9,7 @@ export type AvatarFlow =
   | { step: "choose"; concepts: AvatarConcept[] }
   | { step: "confirm"; concepts: AvatarConcept[]; concept: AvatarConcept; error: string | null }
   | { step: "building"; concepts: AvatarConcept[]; concept: AvatarConcept; jobId: string | null; stage: AvatarStage; progress: number }
+  | { step: "download-failed"; concepts: AvatarConcept[]; concept: AvatarConcept; jobId: string; error: string }
   | { step: "ready"; concept: AvatarConcept };
 
 export type AvatarFlowEvent =
@@ -21,7 +22,19 @@ export type AvatarFlowEvent =
   | { type: "status"; status: AvatarJobStatus }
   | { type: "loaded" }
   | { type: "fail"; message: string }
+  | { type: "download-failed"; message: string }
+  | { type: "retry-download" }
   | { type: "reset" };
+
+const MAX_REASON_LENGTH = 200;
+
+export function failureText(message: string, detail: string | undefined): string {
+  return detail === undefined ? message : `${message} (${detail.slice(0, MAX_REASON_LENGTH)})`;
+}
+
+export function loadFailureMessage(error: unknown): string {
+  return failureText("Avatar failed to load.", error instanceof Error ? error.message : undefined);
+}
 
 export const INITIAL_FLOW: AvatarFlow = { step: "describe", error: null };
 
@@ -61,6 +74,14 @@ export function avatarFlowReducer(flow: AvatarFlow, event: AvatarFlowEvent): Ava
       return flow.step === "building" ? { step: "ready", concept: flow.concept } : flow;
     case "fail":
       return fail(flow, event.message);
+    case "download-failed":
+      return flow.step === "building" && flow.jobId !== null
+        ? { step: "download-failed", concepts: flow.concepts, concept: flow.concept, jobId: flow.jobId, error: event.message }
+        : flow;
+    case "retry-download":
+      return flow.step === "download-failed"
+        ? { step: "building", concepts: flow.concepts, concept: flow.concept, jobId: flow.jobId, stage: "ready", progress: 100 }
+        : flow;
     case "reset":
       return INITIAL_FLOW;
   }

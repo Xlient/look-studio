@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { requestAvatarCheck } from "../studio/avatar-client.ts";
+import { loadFailureMessage } from "../studio/avatar-flow.ts";
 import { setupAvatarFace } from "./avatar-face-setup.ts";
 import { loadAvatarView } from "./avatar-view.ts";
 import type { AvatarView } from "./avatar-view.ts";
 
-export type AvatarViewState = { status: "none" } | { status: "loading" } | { status: "ready"; view: AvatarView; warning: string | null } | { status: "error" };
+export type AvatarViewState = { status: "none" } | { status: "loading" } | { status: "ready"; view: AvatarView; warning: string | null } | { status: "error"; message: string; retry: () => void };
 
 export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
   const [state, setState] = useState<AvatarViewState>({ status: "none" });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (model === null) {
@@ -41,9 +43,9 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
           },
         );
       },
-      () => {
+      (error: unknown) => {
         if (!cancelled) {
-          setState({ status: "error" });
+          setState({ status: "error", message: loadFailureMessage(error), retry: () => setAttempt((count) => count + 1) });
         }
       },
     );
@@ -52,7 +54,7 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
       controller.abort();
       loaded?.dispose();
     };
-  }, [model]);
+  }, [model, attempt]);
 
   return state;
 }
