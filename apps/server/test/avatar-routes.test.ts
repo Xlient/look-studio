@@ -5,10 +5,11 @@ import { AvatarStudio } from "../src/lib/avatar-studio.ts";
 import { FakeAvatarProvider, FakeConceptService } from "../src/lib/avatar-fakes.ts";
 import { InlineJobQueue } from "../src/lib/inline-job-queue.ts";
 import { InMemoryRateLimiter, resetRateLimiter } from "../src/lib/rate-limit.ts";
-import { resetSpendLedger } from "../src/lib/spend-cap.ts";
+import { ClientBudgets, InMemoryBudgetTracker, resetSpendLedger } from "../src/lib/spend-cap.ts";
 import type { ModerationService } from "../src/lib/moderation.ts";
 
 afterEach(() => {
+  delete process.env.TRUSTED_PROXY_HOPS;
   resetRateLimiter();
   resetSpendLedger();
 });
@@ -80,5 +81,55 @@ describe("avatar routes", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).not.toBeNull();
     expect(await res.json()).toEqual({ ok: false, error: "avatar_daily_limit" });
+  });
+
+  it("hides another client's concept, status, events, and model", async () => {
+    process.env.TRUSTED_PROXY_HOPS = "1";
+    const target = app();
+    const as = (ip: string) => ({ "content-type": "application/json", "x-forwarded-for": ip });
+    const owner = as("198.51.100.1");
+    const other = as("198.51.100.2");
+    const drawn = await target.request("/api/avatar/concepts", {
+      method: "POST",
+      headers: owner,
+      body: JSON.stringify({ description: "robot" }),
+    });
+    const { concepts } = (await drawn.json()) as { concepts: { id: string }[] };
+    const start = (headers: Record<string, string>) =>
+      target.request("/api/avatar", { method: "POST", headers, body: JSON.stringify({ conceptId: concepts[0]?.id }) });
+    expect((await start(other)).status).toBe(404);
+    const { jobId } = (await (await start(owner)).json()) as { jobId: string };
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (const path of [`/api/avatar/${jobId}`, `/api/avatar/${jobId}/events`, `/api/avatar/${jobId}/model`]) {
+      expect((await target.request(path, { headers: other })).status).toBe(404);
+    }
+    expect((await target.request(`/api/avatar/${jobId}/model`, { headers: owner })).status).toBe(200);
+  });
+
+  it("refuses new avatars over the client budget but still serves the paid-for model", async () => {
+    process.env.TRUSTED_PROXY_HOPS = "1";
+    const clientBudgets = new ClientBudgets(() => 0.5, new InMemoryBudgetTracker(() => 5));
+    const avatarService = new AvatarStudio({
+      moderation: { check: async () => ({ allowed: true, category: "ok" }) },
+      concepts: new FakeConceptService(),
+      provider: new FakeAvatarProvider(),
+      queue: new InlineJobQueue(),
+      now: Date.now,
+      newId: () => crypto.randomUUID(),
+      onAvatarBuilt: (budget) => void budget.record(0.7),
+    });
+    const target = createApp(createContainer({ avatarService, clientBudgets }));
+    const jobId = await readyJob(target);
+    const over = await post(target, "/api/avatar/concepts", { description: "another" });
+    expect(over.status).toBe(429);
+    expect(((await over.json()) as { error: string }).error).toBe("client_budget_exceeded");
+    const model = await target.request(`/api/avatar/${jobId}/model`, { headers });
+    expect(model.status).toBe(200);
+    const elsewhere = await target.request("/api/avatar/concepts", {
+      method: "POST",
+      headers: { ...headers, "x-forwarded-for": "198.51.100.8" },
+      body: JSON.stringify({ description: "another" }),
+    });
+    expect(elsewhere.status).toBe(200);
   });
 });

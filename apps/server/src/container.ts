@@ -107,18 +107,17 @@ function liveAvatarStudio(base: Container): AvatarService {
   if (!meshyKey) {
     return base.avatarService;
   }
-  const budget = base.budgetTracker;
   return new AvatarStudio({
     moderation: new MuseModeration({
       retryPolicy: base.retryPolicy,
       rateLimiter: base.modelRateLimiter,
-      onTokens: (total) => budget.record(estimateCostUsd(total)),
+      onTokens: (total, budget) => budget.record(estimateCostUsd(total)),
     }),
     concepts: new MuseImageConceptService({
       client: createModelClient(),
       retryPolicy: base.retryPolicy,
       rateLimiter: imageRateLimiter,
-      onImages: (count) => budget.record(count * MUSE_IMAGE_PRICE_USD),
+      onImages: (count, budget) => budget.record(count * MUSE_IMAGE_PRICE_USD),
     }),
     provider: new MeshyAvatarProvider({
       client: createMeshyClient(meshyKey),
@@ -129,7 +128,7 @@ function liveAvatarStudio(base: Container): AvatarService {
     queue: new InlineJobQueue(),
     now: Date.now,
     newId: () => randomUUID(),
-    onAvatarBuilt: () => budget.record(meshyCostUsd()),
+    onAvatarBuilt: (budget) => budget.record(meshyCostUsd()),
   });
 }
 

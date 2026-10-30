@@ -45,8 +45,8 @@ async function handleEvents(c: Context, service: WearableService): Promise<Respo
 
 export function createWearableRoutes(service: WearableService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budgets));
-  app.post("/api/wearable", (c) => handleCreate(c, service));
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/wearable", spendCap, (c) => handleCreate(c, service));
   app.get("/api/wearable/:id/events", (c) => handleEvents(c, service));
   return app;
 }

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { AVATAR_DESCRIPTION_MAX, AvatarImage } from "@look-studio/shared";
 import type { RateLimiter } from "@look-studio/shared";
 import { AvatarBlockedError } from "../lib/avatar-studio.ts";
-import type { AvatarService } from "../lib/avatar-studio.ts";
+import type { AvatarClient, AvatarService } from "../lib/avatar-studio.ts";
 import { invalidRequest, modelErrorResponse, readJsonBody, serviceError } from "../lib/http.ts";
 import { MeshyError } from "../lib/meshy-client.ts";
 import { ContentBlockedError } from "../lib/muse-image.ts";
@@ -31,13 +31,18 @@ async function parseBody<T>(c: Context, schema: z.ZodType<T>): Promise<T | Respo
   return parsed.success ? parsed.data : invalidRequest(c, parsed.error);
 }
 
-async function handleConcepts(c: Context, service: AvatarService): Promise<Response> {
+function avatarClient(c: Context, budgets: ClientBudgets): AvatarClient {
+  const key = clientIp(c);
+  return { key, budget: budgets.forClient(key) };
+}
+
+async function handleConcepts(c: Context, service: AvatarService, budgets: ClientBudgets): Promise<Response> {
   const body = await parseBody(c, ConceptsBody);
   if (body instanceof Response) {
     return body;
   }
   try {
-    const concepts = await service.createConcepts(body.description, body.photo, c.req.raw.signal);
+    const concepts = await service.createConcepts(body.description, body.photo, avatarClient(c, budgets), c.req.raw.signal);
     return c.json({ ok: true, concepts });
   } catch (error) {
     if (error instanceof AvatarBlockedError) {
@@ -50,7 +55,7 @@ async function handleConcepts(c: Context, service: AvatarService): Promise<Respo
   }
 }
 
-function handleStart(service: AvatarService, dailyLimiter: RateLimiter) {
+function handleStart(service: AvatarService, budgets: ClientBudgets, dailyLimiter: RateLimiter) {
   return async (c: Context): Promise<Response> => {
     const body = await parseBody(c, StartBody);
     if (body instanceof Response) {
@@ -61,19 +66,19 @@ function handleStart(service: AvatarService, dailyLimiter: RateLimiter) {
       c.header("Retry-After", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1000))));
       return c.json({ ok: false, error: "avatar_daily_limit" }, 429);
     }
-    const jobId = service.startJob(body.conceptId);
+    const jobId = service.startJob(body.conceptId, avatarClient(c, budgets));
     return jobId === null ? c.json({ ok: false, error: "concept_not_found" }, 404) : c.json({ ok: true, jobId });
   };
 }
 
 function handleStatus(c: Context, service: AvatarService): Response {
-  const status = service.getJob(c.req.param("id") ?? "");
+  const status = service.getJob(c.req.param("id") ?? "", clientIp(c));
   return status === null ? c.json({ ok: false, error: "job_not_found" }, 404) : c.json({ ok: true, status });
 }
 
 async function handleEvents(c: Context, service: AvatarService): Promise<Response> {
   const jobId = c.req.param("id");
-  if (jobId === undefined || service.getJob(jobId) === null) {
+  if (jobId === undefined || service.getJob(jobId, clientIp(c)) === null) {
     return c.json({ ok: false, error: "job_not_found" }, 404);
   }
   return streamSSE(c, async (stream) => {
@@ -84,7 +89,7 @@ async function handleEvents(c: Context, service: AvatarService): Promise<Respons
 async function handleModel(c: Context, service: AvatarService): Promise<Response> {
   const jobId = c.req.param("id") ?? "";
   try {
-    const model = await service.fetchModel(jobId, c.req.raw.signal);
+    const model = await service.fetchModel(jobId, clientIp(c), c.req.raw.signal);
     return model ?? c.json({ ok: false, error: "model_not_ready" }, 404);
   } catch (error) {
     return error instanceof MeshyError ? c.json({ ok: false, error: "model_unavailable" }, 502) : serviceError(c);
@@ -93,9 +98,10 @@ async function handleModel(c: Context, service: AvatarService): Promise<Response
 
 export function createAvatarRoutes(service: AvatarService, budgets: ClientBudgets, dailyLimiter: RateLimiter): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budgets));
-  app.post("/api/avatar/concepts", (c) => handleConcepts(c, service));
-  app.post("/api/avatar", handleStart(service, dailyLimiter));
+  // Reads stay open past the cap: the build that crossed it is already paid for and must download.
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/avatar/concepts", spendCap, (c) => handleConcepts(c, service, budgets));
+  app.post("/api/avatar", spendCap, handleStart(service, budgets, dailyLimiter));
   app.get("/api/avatar/:id", (c) => handleStatus(c, service));
   app.get("/api/avatar/:id/events", (c) => handleEvents(c, service));
   app.get("/api/avatar/:id/model", (c) => handleModel(c, service));

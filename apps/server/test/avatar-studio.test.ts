@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AvatarJobStatus } from "@look-studio/shared";
+import type { AvatarJobStatus, BudgetTracker } from "@look-studio/shared";
 import { AvatarBlockedError, AvatarStudio, failureMessage, overallProgress } from "../src/lib/avatar-studio.ts";
 import type { AvatarStudioDeps } from "../src/lib/avatar-studio.ts";
 import { FakeConceptService, emptyGlb } from "../src/lib/avatar-fakes.ts";
@@ -55,6 +55,20 @@ function studio(overrides: Partial<AvatarStudioDeps> = {}, clock = { t: 0 }) {
 }
 
 const signal = () => new AbortController().signal;
+
+function clientOf(key: string) {
+  const spent: number[] = [];
+  const budget: BudgetTracker = {
+    record: (cost) => {
+      spent.push(cost);
+      return cost;
+    },
+    remaining: () => 1,
+    isExceeded: () => false,
+  };
+  return { key, budget, spent };
+}
+const client = clientOf("203.0.113.1");
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("avatar progress and messages", () => {
@@ -90,61 +104,106 @@ describe("AvatarStudio", () => {
         },
       },
     });
-    await expect(service.createConcepts("x", undefined, signal())).rejects.toBeInstanceOf(AvatarBlockedError);
+    await expect(service.createConcepts("x", undefined, client, signal())).rejects.toBeInstanceOf(AvatarBlockedError);
     expect(drawn).toBe(0);
+  });
+
+  it("keeps concepts and jobs private to the client that made them", async () => {
+    const fake = deferredProvider();
+    const { service } = studio({ provider: fake.provider });
+    const other = clientOf("203.0.113.2");
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const conceptId = concept?.id ?? "";
+    expect(service.startJob(conceptId, other)).toBeNull();
+    const jobId = service.startJob(conceptId, client) ?? "";
+    expect(jobId).not.toBe("");
+    fake.succeed();
+    await flush();
+    expect(service.getJob(jobId, other.key)).toBeNull();
+    expect(await service.fetchModel(jobId, other.key, signal())).toBeNull();
+    expect(service.getJob(jobId, client.key)).toMatchObject({ stage: "ready" });
+    expect(await service.fetchModel(jobId, client.key, signal())).not.toBeNull();
+  });
+
+  it("charges moderation, concepts, and the finished build to the requesting client", async () => {
+    const fake = deferredProvider();
+    const payer = clientOf("203.0.113.3");
+    const { service } = studio({
+      provider: fake.provider,
+      moderation: {
+        check: async (_text, _signal, budget) => {
+          budget.record(0.001);
+          return { allowed: true, category: "ok" };
+        },
+      },
+      concepts: {
+        createConcepts: async (request) => {
+          request.budget.record(0.03);
+          return ["data:image/webp;base64,AAA"];
+        },
+      },
+      onAvatarBuilt: (budget) => void budget.record(0.7),
+    });
+    const [concept] = await service.createConcepts("robot", undefined, payer, signal());
+    service.startJob(concept?.id ?? "", payer);
+    expect(payer.spent).toEqual([0.001, 0.03]);
+    fake.succeed();
+    await flush();
+    expect(payer.spent).toEqual([0.001, 0.03, 0.7]);
+    expect(client.spent).toEqual([]);
   });
 
   it("only builds concepts it drew, once each, before they expire", async () => {
     const clock = { t: 0 };
     const { service } = studio({}, clock);
-    const concepts = await service.createConcepts("robot barista", undefined, signal());
+    const concepts = await service.createConcepts("robot barista", undefined, client, signal());
     expect(concepts).toHaveLength(3);
-    expect(service.startJob("concept-forged")).toBeNull();
+    expect(service.startJob("concept-forged", client)).toBeNull();
     const first = concepts[0]?.id ?? "";
-    expect(service.startJob(first)).not.toBeNull();
-    expect(service.startJob(first)).toBeNull();
+    expect(service.startJob(first, client)).not.toBeNull();
+    expect(service.startJob(first, client)).toBeNull();
     clock.t += 31 * 60_000;
-    expect(service.startJob(concepts[1]?.id ?? "")).toBeNull();
+    expect(service.startJob(concepts[1]?.id ?? "", client)).toBeNull();
   });
 
   it("streams progress to ready, then hands over the model once and cleans up", async () => {
     const run = deferredProvider();
     const { service, built } = studio({ provider: run.provider });
-    const [concept] = await service.createConcepts("robot", undefined, signal());
-    const jobId = service.startJob(concept?.id ?? "") ?? "";
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
     const seen: AvatarJobStatus[] = [];
     const watching = service.subscribe(jobId, async (status) => void seen.push(status), signal());
     run.progress("modeling", 50);
     run.progress("rigging", 50);
-    expect(await service.fetchModel(jobId, signal())).toBeNull();
+    expect(await service.fetchModel(jobId, client.key, signal())).toBeNull();
     run.succeed();
     await watching;
     expect(seen.map((status) => status.stage)).toEqual(["queued", "modeling", "rigging", "ready"]);
     expect(built()).toBe(1);
-    const model = await service.fetchModel(jobId, signal());
+    const model = await service.fetchModel(jobId, client.key, signal());
     expect(model?.headers.get("content-type")).toBe("model/gltf-binary");
     expect(new Uint8Array(await (model ?? new Response()).arrayBuffer()).slice(0, 4)).toEqual(new TextEncoder().encode("glTF"));
     expect(run.cleaned).toEqual(["cleaned"]);
-    expect(service.getJob(jobId)).toBeNull();
+    expect(service.getJob(jobId, client.key)).toBeNull();
   });
 
   it("reports a friendly failure and keeps the last progress", async () => {
     const run = deferredProvider();
     const { service, built } = studio({ provider: run.provider });
-    const [concept] = await service.createConcepts("robot", undefined, signal());
-    const jobId = service.startJob(concept?.id ?? "") ?? "";
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
     run.progress("modeling", 40);
     run.fail(new MeshyError("pose_failed", 422));
     await flush();
-    expect(service.getJob(jobId)).toMatchObject({ stage: "failed", progress: 30, error: expect.stringContaining("humanoid") });
+    expect(service.getJob(jobId, client.key)).toMatchObject({ stage: "failed", progress: 30, error: expect.stringContaining("humanoid") });
     expect(built()).toBe(0);
   });
 
   it("stops streaming when the client goes away", async () => {
     const run = deferredProvider();
     const { service } = studio({ provider: run.provider });
-    const [concept] = await service.createConcepts("robot", undefined, signal());
-    const jobId = service.startJob(concept?.id ?? "") ?? "";
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
     const controller = new AbortController();
     const watching = service.subscribe(jobId, async () => {}, controller.signal);
     controller.abort();

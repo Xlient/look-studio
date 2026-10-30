@@ -1,5 +1,5 @@
 import { AVATAR_CONCEPT_COUNT } from "@look-studio/shared";
-import type { AvatarConcept, AvatarJobStatus, JobQueue } from "@look-studio/shared";
+import type { AvatarConcept, AvatarJobStatus, BudgetTracker, JobQueue } from "@look-studio/shared";
 import { logInfo } from "./logger.ts";
 import type { AvatarBuild, AvatarModelProvider, BuildStage } from "./meshy-avatar.ts";
 import { MeshyError } from "./meshy-client.ts";
@@ -48,13 +48,20 @@ export function failureMessage(error: unknown): string {
   return "Something went wrong building the avatar.";
 }
 
+export interface AvatarClient {
+  readonly key: string;
+  readonly budget: BudgetTracker;
+}
+
 interface StoredConcept {
+  owner: string;
   image: string;
   description: string;
   expiresAt: number;
 }
 
 interface AvatarJob {
+  owner: string;
   createdAt: number;
   status: AvatarJobStatus;
   build: AvatarBuild | null;
@@ -68,16 +75,16 @@ export interface AvatarStudioDeps {
   readonly queue: JobQueue;
   readonly now: () => number;
   readonly newId: () => string;
-  readonly onAvatarBuilt: () => void;
+  readonly onAvatarBuilt: (budget: BudgetTracker) => void;
   readonly fetch?: FetchFn;
 }
 
 export interface AvatarService {
-  createConcepts(description: string, photo: string | undefined, signal: AbortSignal): Promise<AvatarConcept[]>;
-  startJob(conceptId: string): string | null;
-  getJob(jobId: string): AvatarJobStatus | null;
+  createConcepts(description: string, photo: string | undefined, client: AvatarClient, signal: AbortSignal): Promise<AvatarConcept[]>;
+  startJob(conceptId: string, client: AvatarClient): string | null;
+  getJob(jobId: string, owner: string): AvatarJobStatus | null;
   subscribe(jobId: string, emit: (status: AvatarJobStatus) => Promise<void>, signal: AbortSignal): Promise<void>;
-  fetchModel(jobId: string, signal: AbortSignal): Promise<Response | null>;
+  fetchModel(jobId: string, owner: string, signal: AbortSignal): Promise<Response | null>;
 }
 
 const isTerminal = (status: AvatarJobStatus) => status.stage === "ready" || status.stage === "failed";
@@ -113,17 +120,17 @@ export class AvatarStudio implements AvatarService {
     }
   }
 
-  async createConcepts(description: string, photo: string | undefined, signal: AbortSignal): Promise<AvatarConcept[]> {
-    const verdict = await this.deps.moderation.check(description, signal);
+  async createConcepts(description: string, photo: string | undefined, client: AvatarClient, signal: AbortSignal): Promise<AvatarConcept[]> {
+    const verdict = await this.deps.moderation.check(description, signal, client.budget);
     if (!verdict.allowed) {
       throw new AvatarBlockedError(verdict.category);
     }
-    const images = await this.deps.concepts.createConcepts({ description, ...(photo === undefined ? {} : { photo }) }, signal);
+    const images = await this.deps.concepts.createConcepts({ description, budget: client.budget, ...(photo === undefined ? {} : { photo }) }, signal);
     this.prune();
     const expiresAt = this.deps.now() + CONCEPT_TTL_MS;
     return images.slice(0, AVATAR_CONCEPT_COUNT).map((image) => {
       const id = `concept-${this.deps.newId()}`;
-      this.concepts.set(id, { image, description, expiresAt });
+      this.concepts.set(id, { owner: client.key, image, description, expiresAt });
       return { id, image };
     });
   }
@@ -135,15 +142,16 @@ export class AvatarStudio implements AvatarService {
     }
   }
 
-  startJob(conceptId: string): string | null {
+  startJob(conceptId: string, client: AvatarClient): string | null {
     this.prune();
     const concept = this.concepts.get(conceptId);
-    if (concept === undefined) {
+    if (concept === undefined || concept.owner !== client.key) {
       return null;
     }
     this.concepts.delete(conceptId);
     const jobId = `avatar-${this.deps.newId()}`;
     const job: AvatarJob = {
+      owner: client.key,
       createdAt: this.deps.now(),
       status: { jobId, stage: "queued", progress: 0 },
       build: null,
@@ -160,7 +168,7 @@ export class AvatarStudio implements AvatarService {
     queued.result.then(
       (build) => {
         job.build = build;
-        this.deps.onAvatarBuilt();
+        this.deps.onAvatarBuilt(client.budget);
         this.update(job, { jobId, stage: "ready", progress: 100 });
       },
       (error: unknown) => {
@@ -171,8 +179,9 @@ export class AvatarStudio implements AvatarService {
     return jobId;
   }
 
-  getJob(jobId: string): AvatarJobStatus | null {
-    return this.jobs.get(jobId)?.status ?? null;
+  getJob(jobId: string, owner: string): AvatarJobStatus | null {
+    const job = this.jobs.get(jobId);
+    return job !== undefined && job.owner === owner ? job.status : null;
   }
 
   async subscribe(jobId: string, emit: (status: AvatarJobStatus) => Promise<void>, signal: AbortSignal): Promise<void> {
@@ -203,10 +212,10 @@ export class AvatarStudio implements AvatarService {
     });
   }
 
-  async fetchModel(jobId: string, signal: AbortSignal): Promise<Response | null> {
+  async fetchModel(jobId: string, owner: string, signal: AbortSignal): Promise<Response | null> {
     const job = this.jobs.get(jobId);
     const build = job?.build ?? null;
-    if (job === undefined || build === null) {
+    if (job === undefined || job.owner !== owner || build === null) {
       return null;
     }
     const response = await (this.deps.fetch ?? fetch)(build.glbUrl, { signal });

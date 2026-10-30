@@ -38,7 +38,7 @@ async function handleFitCheck(c: Context, service: FitCheckService): Promise<Res
 
 export function createFitCheckRoutes(service: FitCheckService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budgets));
-  app.post("/api/fit-check", (c) => handleFitCheck(c, service));
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/fit-check", spendCap, (c) => handleFitCheck(c, service));
   return app;
 }

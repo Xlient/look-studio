@@ -45,7 +45,7 @@ async function handleEdit(c: Context, service: EditService, budgets: ClientBudge
 
 export function createEditRoutes(service: EditService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budgets));
-  app.post("/api/edit", (c) => handleEdit(c, service, budgets));
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/edit", spendCap, (c) => handleEdit(c, service, budgets));
   return app;
 }

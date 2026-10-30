@@ -78,8 +78,8 @@ async function handleLookStream(c: Context, service: LookService, budgets: Clien
 
 export function createLookRoutes(service: LookService, budgets: ClientBudgets): Hono {
   const app = new Hono();
-  app.use(createSpendCapMiddleware(budgets));
-  app.post("/api/look", (c) => handleLook(c, service, budgets));
-  app.post("/api/look/stream", (c) => handleLookStream(c, service, budgets));
+  const spendCap = createSpendCapMiddleware(budgets);
+  app.post("/api/look", spendCap, (c) => handleLook(c, service, budgets));
+  app.post("/api/look/stream", spendCap, (c) => handleLookStream(c, service, budgets));
   return app;
 }
