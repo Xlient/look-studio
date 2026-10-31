@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AvatarJobStatus } from "@look-studio/shared";
 import type { FetchLike } from "../src/studio/api-client.ts";
 import {
@@ -104,9 +104,36 @@ describe("downloadAvatarModel", () => {
     expect(calls[0]?.url).toBe("/api/avatar/job%201/model");
   });
 
+  it("logs the duration and size of a download, and the reason it failed", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "info").mockImplementation((line: string) => void lines.push(line));
+    let t = 100;
+    const now = () => (t += 50);
+    const good = fakeFetch([new Response(new Uint8Array([1, 2]))]);
+    await downloadAvatarModel("job-1", { signal, fetchFn: good.fetchFn, now });
+    const broken = new Response(new Uint8Array([1]));
+    broken.arrayBuffer = () => Promise.reject(new TypeError("network error"));
+    await downloadAvatarModel("job-1", { signal, fetchFn: fakeFetch([broken]).fetchFn, now });
+    spy.mockRestore();
+    expect(JSON.parse(lines[0] ?? "")).toEqual({ event: "avatar_download", jobId: "job-1", durationMs: 50, bytes: 2, outcome: "ok" });
+    expect(JSON.parse(lines[1] ?? "")).toEqual({ event: "avatar_download", jobId: "job-1", durationMs: 50, bytes: null, outcome: "model_read_failed", detail: "network error" });
+  });
+
+  it("reports why a body could not be read", async () => {
+    const broken = new Response(new Uint8Array([1]));
+    broken.arrayBuffer = () => Promise.reject(new TypeError("network error"));
+    const { fetchFn } = fakeFetch([broken]);
+    expect(await downloadAvatarModel("job-1", { signal, fetchFn })).toEqual({
+      ok: false,
+      error: "model_read_failed",
+      retryAfterS: null,
+      detail: "network error",
+    });
+  });
+
   it("rejects an empty body and passes server errors through", async () => {
     const empty = fakeFetch([new Response(new Uint8Array(0))]);
-    expect(await downloadAvatarModel("job-1", { signal, fetchFn: empty.fetchFn })).toMatchObject({ ok: false, error: "bad_response" });
+    expect(await downloadAvatarModel("job-1", { signal, fetchFn: empty.fetchFn })).toMatchObject({ ok: false, error: "model_read_failed" });
     const gone = fakeFetch([json({ ok: false, error: "model_not_ready" }, 404)]);
     expect(await downloadAvatarModel("job-1", { signal, fetchFn: gone.fetchFn })).toMatchObject({ ok: false, error: "model_not_ready" });
   });

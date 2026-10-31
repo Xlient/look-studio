@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { errorMessage } from "./api-client.ts";
 import type { ApiFailure } from "./api-client.ts";
 import { abortableSleep, downloadAvatarModel, pollAvatarJob, requestConcepts, startAvatar } from "./avatar-client.ts";
-import { INITIAL_FLOW, avatarFlowReducer } from "./avatar-flow.ts";
+import { INITIAL_FLOW, avatarFlowReducer, failureText } from "./avatar-flow.ts";
 import type { AvatarFlow } from "./avatar-flow.ts";
 
 export interface AvatarBuilder {
@@ -11,6 +11,7 @@ export interface AvatarBuilder {
   pick: (conceptId: string) => void;
   back: () => void;
   build: () => void;
+  retryDownload: () => void;
   stop: () => void;
 }
 
@@ -32,6 +33,19 @@ export function useAvatarBuilder(onModel: (model: ArrayBuffer) => void): AvatarB
   const failed = (signal: AbortSignal, failure: ApiFailure) => {
     if (!signal.aborted) {
       dispatch({ type: "fail", message: errorMessage(failure.error, failure.retryAfterS) });
+    }
+  };
+
+  const download = async (jobId: string, signal: AbortSignal) => {
+    const downloaded = await downloadAvatarModel(jobId, { signal });
+    if (signal.aborted) {
+      return;
+    }
+    if (downloaded.ok) {
+      onModel(downloaded.model);
+      dispatch({ type: "loaded" });
+    } else {
+      dispatch({ type: "download-failed", message: failureText(errorMessage(downloaded.error, downloaded.retryAfterS), downloaded.detail) });
     }
   };
 
@@ -67,14 +81,18 @@ export function useAvatarBuilder(onModel: (model: ArrayBuffer) => void): AvatarB
         failed(signal, polled);
         return;
       }
-      const downloaded = await downloadAvatarModel(started.jobId, { signal });
-      if (!downloaded.ok) {
-        failed(signal, downloaded);
-        return;
-      }
-      onModel(downloaded.model);
-      dispatch({ type: "loaded" });
+      await download(started.jobId, signal);
     })();
+  }, [onModel]);
+
+  const retryDownload = useCallback(() => {
+    const current = flowRef.current;
+    if (current.step !== "download-failed") {
+      return;
+    }
+    const signal = begin();
+    dispatch({ type: "retry-download" });
+    void download(current.jobId, signal);
   }, [onModel]);
 
   const stop = useCallback(() => {
@@ -88,6 +106,7 @@ export function useAvatarBuilder(onModel: (model: ArrayBuffer) => void): AvatarB
     pick: useCallback((conceptId: string) => dispatch({ type: "pick", conceptId }), []),
     back: useCallback(() => dispatch({ type: "back" }), []),
     build,
+    retryDownload,
     stop,
   };
 }

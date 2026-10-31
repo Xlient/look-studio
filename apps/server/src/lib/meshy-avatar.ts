@@ -13,7 +13,7 @@ export interface AvatarBuild {
 }
 
 export interface AvatarModelProvider {
-  build(image: string, description: string, signal: AbortSignal, onProgress: (stage: BuildStage, progress: number) => void): Promise<AvatarBuild>;
+  build(image: string, description: string, signal: AbortSignal, onProgress: (stage: BuildStage, progress: number) => void, jobId?: string): Promise<AvatarBuild>;
 }
 
 export type Sleep = (ms: number, signal: AbortSignal) => Promise<void>;
@@ -54,15 +54,24 @@ export class MeshyAvatarProvider implements AvatarModelProvider {
     this.deps = deps;
   }
 
-  private retry<T>(run: () => Promise<T>, signal: AbortSignal): Promise<T> {
-    return this.deps.retryPolicy.run(run, { signal, shouldRetry: isRetryable });
+  private retry<T>(run: () => Promise<T>, signal: AbortSignal, jobId: string, call: string): Promise<T> {
+    let attempt = 0;
+    const shouldRetry = (error: unknown) => {
+      const retryable = isRetryable(error);
+      if (retryable) {
+        attempt += 1;
+        logInfo({ event: "avatar_meshy_retry", jobId, call, attempt, error: error instanceof MeshyError ? error.kind : "unknown" });
+      }
+      return retryable;
+    };
+    return this.deps.retryPolicy.run(run, { signal, shouldRetry });
   }
 
-  private async waitFor(kind: MeshyTaskKind, id: string, signal: AbortSignal, onProgress: (progress: number) => void): Promise<MeshyTask> {
+  private async waitFor(kind: MeshyTaskKind, id: string, signal: AbortSignal, jobId: string, onProgress: (progress: number) => void): Promise<MeshyTask> {
     const pollMs = this.deps.pollMs ?? envNumber("MESHY_POLL_MS", 3_000);
     const deadline = this.deps.now() + (this.deps.maxWaitMs ?? envNumber("MESHY_MAX_WAIT_MS", 15 * 60_000));
     for (;;) {
-      const task = await this.retry(() => this.deps.client.getTask(kind, id, signal), signal);
+      const task = await this.retry(() => this.deps.client.getTask(kind, id, signal), signal, jobId, "get_task");
       if (task.status === "SUCCEEDED") {
         return task;
       }
@@ -85,15 +94,25 @@ export class MeshyAvatarProvider implements AvatarModelProvider {
     }
   }
 
-  async build(image: string, description: string, signal: AbortSignal, onProgress: (stage: BuildStage, progress: number) => void): Promise<AvatarBuild> {
+  private async runStage(stage: BuildStage, kind: MeshyTaskKind, create: () => Promise<string>, created: [MeshyTaskKind, string][], signal: AbortSignal, jobId: string, onProgress: (stage: BuildStage, progress: number) => void): Promise<MeshyTask & { id: string }> {
+    const startedAt = this.deps.now();
+    try {
+      const id = await this.retry(create, signal, jobId, `create_${stage}`);
+      created.push([kind, id]);
+      const task = await this.waitFor(kind, id, signal, jobId, (progress) => onProgress(stage, progress));
+      logInfo({ event: "avatar_stage", jobId, stage, durationMs: this.deps.now() - startedAt, status: task.status });
+      return { ...task, id };
+    } catch (error) {
+      logInfo({ event: "avatar_stage", jobId, stage, durationMs: this.deps.now() - startedAt, status: "ERROR", error: error instanceof MeshyError ? error.kind : "unknown" });
+      throw error;
+    }
+  }
+
+  async build(image: string, description: string, signal: AbortSignal, onProgress: (stage: BuildStage, progress: number) => void, jobId = "none"): Promise<AvatarBuild> {
     const created: [MeshyTaskKind, string][] = [];
     try {
-      const modelId = await this.retry(() => this.deps.client.createImageTo3d(image, buildTexturePrompt(description), signal), signal);
-      created.push(["image-to-3d", modelId]);
-      await this.waitFor("image-to-3d", modelId, signal, (progress) => onProgress("modeling", progress));
-      const rigId = await this.retry(() => this.deps.client.createRigging(modelId, signal), signal);
-      created.push(["rigging", rigId]);
-      const rigged = await this.waitFor("rigging", rigId, signal, (progress) => onProgress("rigging", progress));
+      const model = await this.runStage("modeling", "image-to-3d", () => this.deps.client.createImageTo3d(image, buildTexturePrompt(description), signal), created, signal, jobId, onProgress);
+      const rigged = await this.runStage("rigging", "rigging", () => this.deps.client.createRigging(model.id, signal), created, signal, jobId, onProgress);
       const glbUrl = rigged.result?.rigged_character_glb_url ?? "";
       if (!glbUrl.startsWith("https://")) {
         throw new MeshyError("unavailable");

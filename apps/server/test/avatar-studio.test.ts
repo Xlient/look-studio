@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AvatarJobStatus, BudgetTracker } from "@look-studio/shared";
 import { AvatarBlockedError, AvatarStudio, failureMessage, overallProgress } from "../src/lib/avatar-studio.ts";
 import type { AvatarStudioDeps } from "../src/lib/avatar-studio.ts";
@@ -184,6 +184,83 @@ describe("AvatarStudio", () => {
     expect(model?.headers.get("content-type")).toBe("model/gltf-binary");
     expect(new Uint8Array(await (model ?? new Response()).arrayBuffer()).slice(0, 4)).toEqual(new TextEncoder().encode("glTF"));
     expect(run.cleaned).toEqual(["cleaned"]);
+    expect(service.getJob(jobId, client.key)).toMatchObject({ stage: "ready" });
+  });
+
+  it("serves a downloaded model again from memory, without another Meshy fetch or cleanup", async () => {
+    const run = deferredProvider();
+    let fetches = 0;
+    const { service } = studio({
+      provider: run.provider,
+      fetch: async () => {
+        fetches += 1;
+        return new Response(new Uint8Array([1, 2, 3]));
+      },
+    });
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    run.succeed();
+    await flush();
+    await service.fetchModel(jobId, client.key, signal());
+    const again = await service.fetchModel(jobId, client.key, signal());
+    expect(new Uint8Array(await (again ?? new Response()).arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(fetches).toBe(1);
+    expect(run.cleaned).toEqual(["cleaned"]);
+    expect(await service.fetchModel(jobId, "203.0.113.99", signal())).toBeNull();
+  });
+
+  it("logs each step with timings and never the description or Meshy URL", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line: string) => void lines.push(line));
+    const run = deferredProvider();
+    const clock = { t: 0 };
+    const { service } = studio({ provider: run.provider }, clock);
+    const [concept] = await service.createConcepts("secret robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    clock.t = 5_000;
+    run.succeed();
+    await flush();
+    await service.fetchModel(jobId, client.key, signal());
+    await service.fetchModel(jobId, client.key, signal());
+    spy.mockRestore();
+    const events = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(events.map((event) => event["event"])).toEqual(["avatar_concepts", "avatar_job_started", "avatar_job_ready", "avatar_model_fetch", "avatar_model_fetch"]);
+    expect(events[2]).toMatchObject({ jobId, totalMs: 5_000 });
+    expect(events[3]).toMatchObject({ jobId, first: true, status: "ok" });
+    expect(events[4]).toMatchObject({ jobId, first: false, status: "ok" });
+    expect(lines.join("\n")).not.toContain("secret robot");
+    expect(lines.join("\n")).not.toContain(GLB_URL);
+  });
+
+  it("logs a blocked concept request and a failed model fetch", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line: string) => void lines.push(line));
+    const blocked = studio({ moderation: { check: async () => ({ allowed: false, category: "other_unsafe" }) } }).service;
+    await expect(blocked.createConcepts("x", undefined, client, signal())).rejects.toBeInstanceOf(AvatarBlockedError);
+    const run = deferredProvider();
+    const { service } = studio({ provider: run.provider, fetch: async () => new Response("gone", { status: 500 }) });
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    run.succeed();
+    await flush();
+    await expect(service.fetchModel(jobId, client.key, signal())).rejects.toBeInstanceOf(MeshyError);
+    spy.mockRestore();
+    expect(lines[0]).toContain('"outcome":"blocked"');
+    expect(lines.at(-1)).toContain('"status":"error"');
+    expect(lines.at(-1)).not.toContain(GLB_URL);
+  });
+
+  it("forgets a downloaded model once its retry window ends", async () => {
+    const run = deferredProvider();
+    const clock = { t: 0 };
+    const { service } = studio({ provider: run.provider }, clock);
+    const [concept] = await service.createConcepts("robot", undefined, client, signal());
+    const jobId = service.startJob(concept?.id ?? "", client) ?? "";
+    run.succeed();
+    await flush();
+    expect(await service.fetchModel(jobId, client.key, signal())).not.toBeNull();
+    clock.t = 15 * 60_000;
+    expect(await service.fetchModel(jobId, client.key, signal())).toBeNull();
     expect(service.getJob(jobId, client.key)).toBeNull();
   });
 

@@ -15,6 +15,9 @@ export interface AvatarView {
   readonly camera: PerspectiveCamera;
   readonly model: Object3D;
   readonly head: Object3D | null;
+  readonly meshCount: number;
+  readonly boneCount: number;
+  onFirstFrame(listener: () => void): void;
   setFaceRig(rig: FaceRig): void;
   resize(width: number, height: number): void;
   pose(motion: AvatarMotion, expressions: Float32Array, timeS: number): void;
@@ -65,12 +68,14 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
   scene.add(model, new AmbientLight(0xffffff, 1.1), key);
 
   const bones: Object3D[] = [];
+  let meshCount = 0;
   model.traverse((object: Object3D) => {
     if (object instanceof Bone) {
       bones.push(object);
     }
     // Skinned meshes keep their bind-pose bounds, so a turned head could be culled.
     if (object instanceof Mesh) {
+      meshCount += 1;
       object.frustumCulled = false;
     }
   });
@@ -88,6 +93,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
 
   const rig = createRigPose();
   let faceRig: FaceRig | null = null;
+  let firstFrame: (() => void) | null = null;
   const euler = new Euler();
   const delta = new Quaternion();
   const parentWorld = new Quaternion();
@@ -114,6 +120,11 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
     camera,
     model,
     head: head?.bone ?? null,
+    meshCount,
+    boneCount: bones.length,
+    onFirstFrame(listener) {
+      firstFrame = listener;
+    },
     setFaceRig(next) {
       faceRig = next;
     },
@@ -122,6 +133,11 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
       camera.updateProjectionMatrix();
     },
     pose(motion, expressions, timeS) {
+      if (firstFrame !== null) {
+        const listener = firstFrame;
+        firstFrame = null;
+        listener();
+      }
       faceRig?.apply(expressions);
       writeRigPose(rig, motion, timeS);
       if (head === null) {

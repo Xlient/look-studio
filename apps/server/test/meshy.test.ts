@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MESHY_BASE_URL, MeshyError, createMeshyClient, mapMeshyStatus } from "../src/lib/meshy-client.ts";
 import type { MeshyClient, MeshyTask, MeshyTaskKind } from "../src/lib/meshy-client.ts";
 import { MeshyAvatarProvider } from "../src/lib/meshy-avatar.ts";
@@ -122,6 +122,20 @@ describe("Meshy avatar provider", () => {
     expect(log.filter((line) => line.startsWith("create"))).toEqual(["create:image-to-3d", "create:rigging:model-1"]);
     await build.cleanup(new AbortController().signal);
     expect(log.filter((line) => line.startsWith("delete"))).toEqual(["delete:image-to-3d:model-1", "delete:rigging:rig-1"]);
+  });
+
+  it("logs each stage with the job id, and which stage failed", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line: string) => void lines.push(line));
+    const { client } = fakeClient({ modeling: [task("SUCCEEDED", 100)], rigging: [task("FAILED", 10)] });
+    await expect(provider(client).build(IMAGE, "secret robot", new AbortController().signal, () => {}, "job-1")).rejects.toBeInstanceOf(MeshyError);
+    spy.mockRestore();
+    const stages = lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line["event"] === "avatar_stage");
+    expect(stages).toMatchObject([
+      { jobId: "job-1", stage: "modeling", status: "SUCCEEDED" },
+      { jobId: "job-1", stage: "rigging", status: "ERROR", error: "rejected" },
+    ]);
+    expect(lines.join("\n")).not.toContain("secret robot");
   });
 
   it("fails on a failed task and deletes what it created", async () => {

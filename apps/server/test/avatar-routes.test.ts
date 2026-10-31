@@ -44,7 +44,7 @@ async function readyJob(target: ReturnType<typeof createApp>): Promise<string> {
 }
 
 describe("avatar routes", () => {
-  it("draws concepts, builds an avatar, reports status, and serves the GLB once", async () => {
+  it("draws concepts, builds an avatar, reports status, and serves the GLB for retries", async () => {
     const target = app();
     const jobId = await readyJob(target);
     const status = (await (await target.request(`/api/avatar/${jobId}`)).json()) as { status: { stage: string; progress: number } };
@@ -54,7 +54,7 @@ describe("avatar routes", () => {
     const model = await target.request(`/api/avatar/${jobId}/model`);
     expect(model.headers.get("content-type")).toBe("model/gltf-binary");
     expect(new TextDecoder().decode(new Uint8Array(await model.arrayBuffer()).slice(0, 4))).toBe("glTF");
-    expect((await target.request(`/api/avatar/${jobId}/model`)).status).toBe(404);
+    expect((await target.request(`/api/avatar/${jobId}/model`)).status).toBe(200);
   });
 
   it("blocks unsafe descriptions with the category", async () => {

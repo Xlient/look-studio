@@ -1,4 +1,5 @@
 import { AVATAR_CONCEPT_COUNT, AvatarCheck, AvatarConcept, AvatarJobStatus } from "@look-studio/shared";
+import { logEvent } from "./logger.ts";
 import { failureFrom, postForPayload, resolveFetch, transportFailure } from "./api-client.ts";
 import type { ApiFailure, RequestOptions } from "./api-client.ts";
 
@@ -66,17 +67,35 @@ export async function getAvatarStatus(jobId: string, options: RequestOptions): P
   return checked.success && checked.data.jobId === jobId ? { ok: true, status: checked.data } : BAD_RESPONSE;
 }
 
-export async function downloadAvatarModel(jobId: string, options: RequestOptions): Promise<{ ok: true; model: ArrayBuffer } | ApiFailure> {
+async function fetchModelBytes(jobId: string, options: RequestOptions): Promise<{ ok: true; model: ArrayBuffer } | ApiFailure> {
   const response = await getFrom(`/api/avatar/${encodeURIComponent(jobId)}/model`, options, MODEL_TIMEOUT_MS);
   if (!(response instanceof Response)) {
     return response;
   }
   try {
     const model = await response.arrayBuffer();
-    return model.byteLength > 0 && model.byteLength <= MAX_MODEL_BYTES ? { ok: true, model } : BAD_RESPONSE;
-  } catch {
-    return BAD_RESPONSE;
+    return model.byteLength > 0 && model.byteLength <= MAX_MODEL_BYTES
+      ? { ok: true, model }
+      : { ok: false, error: "model_read_failed", retryAfterS: null, detail: `received ${model.byteLength} bytes` };
+  } catch (error) {
+    return { ok: false, error: "model_read_failed", retryAfterS: null, detail: error instanceof Error ? error.message : "unknown error" };
   }
+}
+
+export async function downloadAvatarModel(
+  jobId: string,
+  options: RequestOptions & { now?: () => number },
+): Promise<{ ok: true; model: ArrayBuffer } | ApiFailure> {
+  const now = options.now ?? (() => performance.now());
+  const startedAt = now();
+  const result = await fetchModelBytes(jobId, options);
+  const durationMs = Math.round(now() - startedAt);
+  logEvent(
+    result.ok
+      ? { event: "avatar_download", jobId, durationMs, bytes: result.model.byteLength, outcome: "ok" }
+      : { event: "avatar_download", jobId, durationMs, bytes: null, outcome: result.error, detail: result.detail ?? null },
+  );
+  return result;
 }
 
 export interface PollOptions extends RequestOptions {

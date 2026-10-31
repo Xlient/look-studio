@@ -19,6 +19,7 @@ export interface ApiFailure {
   ok: false;
   error: string;
   retryAfterS: number | null;
+  detail?: string;
 }
 
 export type ApiResult<T> = { ok: true; data: T; meta: CallMeta } | ApiFailure;
@@ -267,6 +268,8 @@ export function errorMessage(error: string, retryAfterS: number | null): string 
     case "model_unavailable":
     case "model_not_ready":
       return "The finished avatar couldn't be downloaded. Try building it again.";
+    case "model_read_failed":
+      return "The finished avatar didn't download completely.";
     case "avatar_failed":
       return "The 3D build didn't work. Try a different concept.";
     case "aborted":

@@ -187,6 +187,16 @@ export default function CameraPreview({ look, thinking, avatarModel }: CameraPre
               {avatar.warning}
             </p>
           )}
+          {avatar.status === "error" && (
+            <>
+              <p className="player__note" role="alert">
+                {avatar.message}
+              </p>
+              <button type="button" className="btn" onClick={avatar.retry}>
+                Try loading again
+              </button>
+            </>
+          )}
           {avatarModel !== null && (
             <button
               type="button"

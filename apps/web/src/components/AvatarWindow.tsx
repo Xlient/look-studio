@@ -84,7 +84,7 @@ function DescribeForm({ error, onDraw }: { error: string | null; onDraw: (descri
 }
 
 export default function AvatarWindow({ onModel }: { onModel: (model: ArrayBuffer) => void }) {
-  const { flow, draw, pick, back, build, stop } = useAvatarBuilder(onModel);
+  const { flow, draw, pick, back, build, retryDownload, stop } = useAvatarBuilder(onModel);
 
   return (
     <Window id="avatar" title="Avatar Maker" icon="🧸" flavor="lime" className="win--avatar">
@@ -140,6 +140,19 @@ export default function AvatarWindow({ onModel }: { onModel: (model: ArrayBuffer
             <progress id="avatar-progress" max={100} value={flow.progress} />
             <button type="button" className="btn btn--small" onClick={stop}>
               Stop waiting
+            </button>
+          </div>
+        )}
+        {flow.step === "download-failed" && (
+          <div className="avatar__wait">
+            <p className="avatar__error" role="alert">
+              {flow.error}
+            </p>
+            <button type="button" className="btn btn--small" onClick={retryDownload}>
+              Download again
+            </button>
+            <button type="button" className="btn btn--small" onClick={stop}>
+              Start over
             </button>
           </div>
         )}
