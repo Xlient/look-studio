@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { LookSpec } from "@look-studio/shared";
 import { errorMessage, requestEdit, streamLook } from "./api-client.ts";
-import { composePrompt, contextNote } from "./prompt-compose.ts";
+import { composeEdit, composePrompt, contextNote } from "./prompt-compose.ts";
 import type { LookContext } from "./prompt-compose.ts";
 import { initialStudioState, nextCall, studioReducer } from "./studio-state.ts";
 import type { StudioState } from "./studio-state.ts";
@@ -49,7 +49,7 @@ export function useStudio(): {
       ...(note === undefined ? {} : { note }),
     });
     if (call === "edit" && current.look !== null) {
-      const result = await requestEdit({ utterance: text, look: current.look }, { signal: controller.signal });
+      const result = await requestEdit({ utterance: composeEdit(text, context.skin), look: current.look }, { signal: controller.signal });
       dispatch(
         result.ok
           ? { type: "edit-received", at: clockTime(), edits: result.data, meta: result.meta }

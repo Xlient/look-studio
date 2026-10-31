@@ -836,6 +836,12 @@ body {
   margin-bottom: 6px;
 }
 
+.vibe__skin {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .vibe__dial {
   display: flex;
   align-items: center;

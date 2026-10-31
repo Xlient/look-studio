@@ -38,4 +38,9 @@ describe("asksToChangeSkinTone", () => {
   ])("allows %j", (text) => {
     expect(asksToChangeSkinTone(text)).toBe(false);
   });
+
+  it.each(["fair", "light", "medium", "tan", "deep"])("allows the picker's %s skin line", (tone) => {
+    const line = `The wearer's own skin: ${tone}, warm undertone. Pick makeup shades that flatter this. This is background, not a change request.`;
+    expect(asksToChangeSkinTone(line)).toBe(false);
+  });
 });
