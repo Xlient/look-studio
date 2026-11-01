@@ -83,9 +83,9 @@ describe("spoofed X-Forwarded-For", () => {
 });
 
 describe("ClientBudgets", () => {
-  function budgets(day: () => string = () => "2026-01-01") {
-    const global = new InMemoryBudgetTracker(() => 5, day);
-    return { global, clients: new ClientBudgets(() => 0.5, global, day) };
+  function budgets(now: () => number = () => 0) {
+    const global = new InMemoryBudgetTracker(() => 5, now);
+    return { global, clients: new ClientBudgets(() => 0.5, global, now) };
   }
 
   it("blocks one client without blocking another", () => {
@@ -103,11 +103,11 @@ describe("ClientBudgets", () => {
     expect(clients.refusalFor("b")).toBe("spend_cap_exceeded");
   });
 
-  it("resets clients on a new UTC day", () => {
-    let day = "2026-01-01";
-    const { clients } = budgets(() => day);
+  it("frees a client's spend once it is a day old", () => {
+    let now = 0;
+    const { clients } = budgets(() => now);
     clients.forClient("a").record(0.5);
-    day = "2026-01-02";
+    now = 24 * 60 * 60_000;
     expect(clients.refusalFor("a")).toBeNull();
   });
 

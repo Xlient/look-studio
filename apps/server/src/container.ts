@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { TokenBucketRateLimiter } from "@look-studio/core";
 import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { FakeAvatarCheckService, MuseAvatarCheckService } from "./lib/avatar-check.ts";
 import type { AvatarCheckService } from "./lib/avatar-check.ts";
@@ -60,7 +61,7 @@ const defaultAvatarCheckLimiter: RateLimiter = new InMemoryRateLimiter(() => ({
 }));
 
 // Muse Image allows 150 requests per minute.
-const imageRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 150, windowMs: 60_000 }));
+const imageRateLimiter: RateLimiter = new TokenBucketRateLimiter(() => ({ capacity: 150, refillPerSecond: 150 / 60 }));
 
 function fakeAvatarStudio(): AvatarService {
   return new AvatarStudio({
@@ -74,8 +75,8 @@ function fakeAvatarStudio(): AvatarService {
   });
 }
 
-// Stand-in until the core token bucket lands; Muse Spark allows 3,000 requests per minute.
-const defaultModelRateLimiter: RateLimiter = new InMemoryRateLimiter(() => ({ max: 3000, windowMs: 60_000 }));
+// Muse Spark allows 3,000 requests per minute.
+const defaultModelRateLimiter: RateLimiter = new TokenBucketRateLimiter(() => ({ capacity: 3_000, refillPerSecond: 3_000 / 60 }));
 
 export function createContainer(overrides: Partial<Container> = {}): Container {
   const budgetTracker = overrides.budgetTracker ?? defaultBudgetTracker;

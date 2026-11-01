@@ -1,11 +1,8 @@
 import type { Context, Next } from "hono";
+import { LruCache, SlidingWindowBudget } from "@look-studio/core";
 import type { BudgetTracker } from "@look-studio/shared";
 import { envNumber } from "../env.ts";
 import { clientIp } from "./rate-limit.ts";
-
-export function utcDay(now = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
 
 export function dailySpendCapUsd(): number {
   return envNumber("DAILY_SPEND_CAP_USD", 5);
@@ -23,74 +20,29 @@ export function estimateCostUsd(totalTokens: number): number {
   return (totalTokens / 1000) * pricePer1kTokensUsd();
 }
 
-export class InMemoryBudgetTracker implements BudgetTracker {
-  private readonly capUsd: () => number;
-  private readonly today: () => string;
-  private day: string;
-  private spendUsd = 0;
-
-  constructor(capUsd: () => number, today: () => string = () => utcDay()) {
-    this.capUsd = capUsd;
-    this.today = today;
-    this.day = this.today();
-  }
-
-  record(costUsd: number): number {
-    this.rollover();
-    this.spendUsd += costUsd;
-    return this.spendUsd;
-  }
-
-  remaining(): number {
-    this.rollover();
-    return this.capUsd() - this.spendUsd;
-  }
-
-  isExceeded(): boolean {
-    this.rollover();
-    return this.spendUsd >= this.capUsd();
-  }
-
-  spent(): number {
-    this.rollover();
-    return this.spendUsd;
-  }
-
-  reset(): void {
-    this.day = this.today();
-    this.spendUsd = 0;
-  }
-
-  private rollover(): void {
-    const current = this.today();
-    if (this.day !== current) {
-      this.day = current;
-      this.spendUsd = 0;
-    }
-  }
-}
+export { SlidingWindowBudget as InMemoryBudgetTracker };
 
 export type BudgetRefusal = "spend_cap_exceeded" | "client_budget_exceeded";
+
+// Beyond this many recent clients the least recent is forgotten, which resets only its own budget.
+const MAX_TRACKED_CLIENTS = 10_000;
 
 export class ClientBudgets {
   private readonly capUsd: () => number;
   private readonly global: BudgetTracker;
-  private readonly today: () => string;
-  private readonly clients = new Map<string, InMemoryBudgetTracker>();
-  private day: string;
+  private readonly now: () => number;
+  private readonly clients = new LruCache<string, SlidingWindowBudget>(MAX_TRACKED_CLIENTS);
 
-  constructor(capUsd: () => number, global: BudgetTracker, today: () => string = () => utcDay()) {
+  constructor(capUsd: () => number, global: BudgetTracker, now: () => number = Date.now) {
     this.capUsd = capUsd;
     this.global = global;
-    this.today = today;
-    this.day = this.today();
+    this.now = now;
   }
 
   refusalFor(client: string): BudgetRefusal | null {
     if (this.global.isExceeded()) {
       return "spend_cap_exceeded";
     }
-    this.rollover();
     return this.clients.get(client)?.isExceeded() === true ? "client_budget_exceeded" : null;
   }
 
@@ -105,27 +57,18 @@ export class ClientBudgets {
     };
   }
 
-  private tracker(client: string): InMemoryBudgetTracker {
-    this.rollover();
+  private tracker(client: string): SlidingWindowBudget {
     const existing = this.clients.get(client);
     if (existing !== undefined) {
       return existing;
     }
-    const created = new InMemoryBudgetTracker(this.capUsd, this.today);
+    const created = new SlidingWindowBudget(this.capUsd, this.now);
     this.clients.set(client, created);
     return created;
   }
-
-  private rollover(): void {
-    const current = this.today();
-    if (this.day !== current) {
-      this.day = current;
-      this.clients.clear();
-    }
-  }
 }
 
-const ledger = new InMemoryBudgetTracker(() => dailySpendCapUsd());
+const ledger = new SlidingWindowBudget(() => dailySpendCapUsd());
 
 export const defaultBudgetTracker: BudgetTracker = ledger;
 

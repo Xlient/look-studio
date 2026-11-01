@@ -12,10 +12,11 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/core/package.json packages/core/
 RUN pnpm install --frozen-lockfile --prod --filter "@look-studio/server..."
 
+COPY packages/core/src packages/core/src
 COPY packages/shared/src packages/shared/src
 COPY apps/server/src apps/server/src
 
 USER node
 EXPOSE 8080
-# Node 24 strips types natively; shared is resolved through its realpath, so no build step is needed.
+# Node 24 strips types natively; core and shared are resolved through their realpaths, so no build step is needed.
 CMD ["node", "apps/server/src/index.ts"]
