@@ -219,8 +219,10 @@ declare module "three/addons/loaders/GLTFLoader.js" {
 
   export interface GLTF {
     scene: Group;
+    userData: Record<string, unknown>;
   }
   export class GLTFLoader {
+    register(callback: (parser: unknown) => unknown): this;
     parseAsync(data: ArrayBuffer, path: string): Promise<GLTF>;
   }
 }

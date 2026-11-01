@@ -1,6 +1,8 @@
 import { AmbientLight, Bone, Box3, Color, DirectionalLight, Euler, Mesh, PerspectiveCamera, Quaternion, Scene, Texture, Vector3 } from "three";
 import type { Group, Material, Object3D } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+import { VRM_EXPRESSIONS, writeVrmWeights } from "./vrm-expressions.ts";
 import { frameBust } from "./avatar-framing.ts";
 import { createRigPose, findRigBones, writeRigPose } from "./avatar-rig.ts";
 import type { AvatarMotion, BoneTurn } from "./avatar-rig.ts";
@@ -13,6 +15,7 @@ export interface AvatarView {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
   readonly model: Object3D;
+  readonly kind: "vrm" | "glb";
   readonly head: Object3D | null;
   readonly meshCount: number;
   readonly boneCount: number;
@@ -60,8 +63,14 @@ function disposeMaterial(material: Material) {
 }
 
 export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
-  const gltf = await new GLTFLoader().parseAsync(data, "");
-  const model = gltf.scene;
+  const loader = new GLTFLoader();
+  loader.register((parser) => new VRMLoaderPlugin(parser));
+  const gltf = await loader.parseAsync(data, "");
+  const vrm = gltf.userData["vrm"] instanceof VRM ? gltf.userData["vrm"] : null;
+  if (vrm !== null) {
+    VRMUtils.rotateVRM0(vrm);
+  }
+  const model = vrm?.scene ?? gltf.scene;
   const scene = new Scene();
   scene.background = new Color(BACKGROUND);
   const key = new DirectionalLight(0xffffff, 2);
@@ -85,12 +94,19 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
     const bone = index === null ? undefined : bones[index];
     return bone === undefined ? null : { bone, rest: bone.quaternion.clone() };
   };
-  const head = drive(found.head);
-  const neck = drive(found.neck);
-  const spine = drive(found.spine);
+  // VRM poses its normalized bones and copies them onto the raw skeleton in update().
+  const node = (name: "head" | "neck" | "spine"): DrivenBone | null => {
+    const bone = vrm?.humanoid.getNormalizedBoneNode(name) ?? null;
+    return bone === null ? null : { bone, rest: bone.quaternion.clone() };
+  };
+  const head = vrm === null ? drive(found.head) : node("head");
+  const neck = vrm === null ? drive(found.neck) : node("neck");
+  const spine = vrm === null ? drive(found.spine) : node("spine");
+  const vrmWeights = new Float32Array(VRM_EXPRESSIONS.length);
+  let lastPoseS: number | null = null;
 
   const camera = new PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
-  frameCamera(model, head?.bone ?? null, camera);
+  frameCamera(model, vrm === null ? (head?.bone ?? null) : vrm.humanoid.getRawBoneNode("head"), camera);
 
   const rig = createRigPose();
   let faceRig: FaceRig | null = null;
@@ -120,6 +136,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
     scene,
     camera,
     model,
+    kind: vrm === null ? "glb" : "vrm",
     head: head?.bone ?? null,
     meshCount,
     boneCount: bones.length,
@@ -139,7 +156,12 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
         firstFrame = null;
         listener();
       }
-      faceRig?.apply(expressions);
+      if (vrm === null) {
+        faceRig?.apply(expressions);
+      } else {
+        writeVrmWeights(vrmWeights, expressions);
+        VRM_EXPRESSIONS.forEach((name, index) => vrm.expressionManager?.setValue(name, vrmWeights[index] ?? 0));
+      }
       writeRigPose(rig, motion, timeS);
       if (head === null) {
         rig.neck.yaw += rig.head.yaw;
@@ -149,8 +171,17 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
       turn(spine, rig.spine);
       turn(neck, rig.neck);
       turn(head, rig.head);
+      if (vrm !== null) {
+        const dtS = lastPoseS === null ? 0 : Math.min(0.1, Math.max(0, timeS - lastPoseS));
+        lastPoseS = timeS;
+        vrm.update(dtS);
+      }
     },
     dispose() {
+      if (vrm !== null) {
+        VRMUtils.deepDispose(model);
+        return;
+      }
       model.traverse((object: Object3D) => {
         if (object instanceof Mesh) {
           object.geometry.dispose();

@@ -63,6 +63,7 @@ describe("Muse Image concepts", () => {
     expect(requests[0]?.url).toBe("https://api.meta.ai/v1/images/edits");
     expect(requests[0]?.multipart).toBe(true);
     expect(buildConceptPrompt("x", true)).toContain("Do not copy the person's face");
+    expect(buildConceptPrompt("x", false)).toContain("mouth closed, and a neutral expression");
   });
 
   it("turns a content-policy block into ContentBlockedError without retrying", async () => {
