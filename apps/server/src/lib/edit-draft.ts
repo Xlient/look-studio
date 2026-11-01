@@ -46,6 +46,7 @@ export function buildEditPrompt(utterance: string, look: LookSpec): string {
     "- add: fill wearable. recolor: color as #RRGGBB, for wearables only. scale: factor (2 = twice as big).",
     `- move: delta in head-widths, each axis between -${MAX_DELTA} and ${MAX_DELTA}; +y is up, +x is the viewer's right, +z is toward the camera.`,
     "- Set every field that the op does not use to null.",
+    '- If the request could mean more than one wearable (such as "the hat" when there are two hats), or names an item that is not in the look and is not an add, return an empty edits list.',
     "- Never describe, rate, or comment on the person's face, skin, or body.",
     `User request: """${utterance}"""`,
   ].join("\n");

@@ -1,0 +1,1535 @@
+[
+ {
+  "id": "edit-001",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the lips redder",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red",
+      "pink"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-002",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "switch to a coral lip",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "orange",
+      "pink",
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-003",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "nude lipstick please",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "brown",
+      "pink",
+      "orange"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-004",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "deep plum lips",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "purple",
+      "pink",
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-005",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make my lipstick a little lighter",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "shade": "lighter"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-006",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "darker lips",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "shade": "darker"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-007",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "a more subtle lip",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-008",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "bolder lipstick",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "opacity": "higher"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-009",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "take the lipstick off",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "opacity": "zero"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-010",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "rosy pink blush",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "family": [
+      "pink",
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-011",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "peach blush instead",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "family": [
+      "orange",
+      "pink"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-012",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "tone down the blush",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-013",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "remove the blush",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "zero"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-014",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "more blush",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "higher"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-015",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "gold eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "yellow",
+      "orange",
+      "brown"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-016",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "smoky black eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "black",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-017",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "emerald green eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "green"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-018",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "blue eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "blue"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-019",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "softer eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-020",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "no eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "opacity": "zero"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-021",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lighter brows",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "shade": "lighter"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-022",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "darker eyebrows",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "shade": "darker"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-023",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the brows more subtle",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-024",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "black brows",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "family": [
+      "black",
+      "grey",
+      "brown"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-025",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the crown silver",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-crown",
+     "family": [
+      "grey",
+      "white"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-026",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "turn the crown rose gold",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-crown",
+     "family": [
+      "pink",
+      "orange",
+      "yellow",
+      "brown"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-027",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "black glasses",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "black",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-028",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the heart glasses red",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-029",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "blue frames",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "blue"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-030",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the crown bigger",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "bigger"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-031",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "shrink the glasses a bit",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-glasses",
+     "factor": "smaller"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-032",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "the crown is too big",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "smaller"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-033",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "move the crown higher",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-crown",
+     "move": "up"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-034",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lower the crown a little",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-crown",
+     "move": "down"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-035",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "nudge the glasses down",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-glasses",
+     "move": "down"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-036",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "move the crown to the left",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-crown",
+     "move": "left"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-037",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "shift the glasses to the right",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-glasses",
+     "move": "right"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-038",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "take off the glasses",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-glasses"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-039",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "remove the crown",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-crown"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-040",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "hide the crown for now",
+   "expect": [
+    {
+     "op": "toggle",
+     "target": "w-crown"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-041",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lose the sunglasses",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-glasses"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-042",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "add a pearl necklace",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "necklace",
+      "custom"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-043",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "add a watch",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "watch",
+      "custom"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-044",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "put a denim jacket on me",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "jacket"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-045",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "add sparkly earrings",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "custom",
+      "necklace"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-046",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "redder lips and smaller crown",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red",
+      "pink"
+     ]
+    },
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "smaller"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-047",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lighter brows and a subtler lip",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "shade": "lighter"
+    },
+    {
+     "op": "makeup",
+     "target": "lips",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-048",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the crown silver and the glasses black",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-crown",
+     "family": [
+      "grey",
+      "white"
+     ]
+    },
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "black",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-049",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "remove the glasses and add a necklace",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-glasses"
+    },
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "necklace",
+      "custom"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-050",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "pink blush, gold eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "family": [
+      "pink",
+      "red"
+     ]
+    },
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "yellow",
+      "orange",
+      "brown"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-051",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "move the crown up and make it bigger",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-crown",
+     "move": "up"
+    },
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "bigger"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-052",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "no blush, no eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "zero"
+    },
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "opacity": "zero"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-053",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "darker lips, darker brows, and lose the glasses",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "shade": "darker"
+    },
+    {
+     "op": "makeup",
+     "target": "brows",
+     "shade": "darker"
+    },
+    {
+     "op": "remove",
+     "target": "w-glasses"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-054",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "red glasses to match a red lip",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "red"
+     ]
+    },
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-055",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "tone everything down: softer blush and softer eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "lower"
+    },
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-056",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the lips berry and the crown smaller",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "purple",
+      "pink",
+      "red"
+     ]
+    },
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "smaller"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-057",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "add a hat and remove the crown",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "hat"
+     ]
+    },
+    {
+     "op": "remove",
+     "target": "w-crown"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-058",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lips: more red pls",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red",
+      "pink"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-059",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "can u make the crown like way smaller",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-crown",
+     "factor": "smaller"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-060",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "ugh the glasses, get rid of them",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-glasses"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-061",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "crown up a smidge",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-crown",
+     "move": "up"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-062",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "I want a glossy red lip",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-063",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "brows a touch lighter please",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "shade": "lighter"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-064",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "Make The Glasses White",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "white",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-065",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "could the blush be less obvious?",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-066",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "the eyeshadow is too much",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "opacity": "lower"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-067",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "purple crown",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-crown",
+     "family": [
+      "purple"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-068",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "green glasses",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "green"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-069",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "orange lips",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "orange",
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-070",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "brown eyeshadow",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "eyeshadow",
+     "family": [
+      "brown",
+      "orange"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-071",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "double the size of the glasses",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-glasses",
+     "factor": "bigger"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-072",
+  "input": {
+   "look": "two-hats",
+   "utterance": "make the red cap black",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-cap",
+     "family": [
+      "black",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-073",
+  "input": {
+   "look": "two-hats",
+   "utterance": "remove the beanie",
+   "expect": [
+    {
+     "op": "remove",
+     "target": "w-beanie"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-074",
+  "input": {
+   "look": "two-hats",
+   "utterance": "make the blue beanie green",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-beanie",
+     "family": [
+      "green"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-075",
+  "input": {
+   "look": "two-hats",
+   "utterance": "bigger cap",
+   "expect": [
+    {
+     "op": "scale",
+     "target": "w-cap",
+     "factor": "bigger"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-076",
+  "input": {
+   "look": "two-hats",
+   "utterance": "move the beanie up",
+   "expect": [
+    {
+     "op": "move",
+     "target": "w-beanie",
+     "move": "up"
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-077",
+  "input": {
+   "look": "two-hats",
+   "utterance": "redder lips",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red",
+      "pink"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-078",
+  "input": {
+   "look": "two-hats",
+   "utterance": "make the hat bigger",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-079",
+  "input": {
+   "look": "two-hats",
+   "utterance": "remove the hat",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-080",
+  "input": {
+   "look": "two-hats",
+   "utterance": "change the hat colour to white",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-081",
+  "input": {
+   "look": "bare",
+   "utterance": "add a crown",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "hat",
+      "custom"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-082",
+  "input": {
+   "look": "bare",
+   "utterance": "add sunglasses",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "glasses"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-083",
+  "input": {
+   "look": "bare",
+   "utterance": "give me a red lip",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "family": [
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-084",
+  "input": {
+   "look": "bare",
+   "utterance": "add a little pink blush",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "blush",
+     "family": [
+      "pink",
+      "red"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-085",
+  "input": {
+   "look": "bare",
+   "utterance": "add a beanie and glasses",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "hat"
+     ]
+    },
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "glasses"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-086",
+  "input": {
+   "look": "bare",
+   "utterance": "make the crown bigger",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-087",
+  "input": {
+   "look": "bare",
+   "utterance": "remove the glasses",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-088",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the scarf longer",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-089",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "move the necklace down",
+   "expect": "unresolved"
+  }
+ },
+ {
+  "id": "edit-090",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make my skin darker",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-091",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "lighten my skin",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-092",
+  "input": {
+   "look": "bare",
+   "utterance": "whiten my complexion",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-093",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "change my skin tone",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-094",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "give me paler skin",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-095",
+  "input": {
+   "look": "bare",
+   "utterance": "darken my face",
+   "expect": "refused"
+  }
+ },
+ {
+  "id": "edit-096",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "white glasses",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "white",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-097",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "brown brows",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "brows",
+     "family": [
+      "brown",
+      "black"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-098",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "black crown",
+   "expect": [
+    {
+     "op": "recolor",
+     "target": "w-crown",
+     "family": [
+      "black",
+      "grey"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-099",
+  "input": {
+   "look": "bare",
+   "utterance": "add brown sunglasses",
+   "expect": [
+    {
+     "op": "add",
+     "target": "new",
+     "types": [
+      "glasses"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "edit-100",
+  "input": {
+   "look": "crown-glam",
+   "utterance": "make the lips a little darker and the glasses white",
+   "expect": [
+    {
+     "op": "makeup",
+     "target": "lips",
+     "shade": "darker"
+    },
+    {
+     "op": "recolor",
+     "target": "w-glasses",
+     "family": [
+      "white",
+      "grey"
+     ]
+    }
+   ]
+  }
+ }
+]

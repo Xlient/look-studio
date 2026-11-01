@@ -7,6 +7,7 @@ const PATTERNS = [
   /\b(black|brown|yellow|red)[\s-]?face\b/,
   /\b(darken|lighten|whiten|bleach|tan)\w*\s+(my|the|her|his|their)?\s*(skin|face|complexion)\b/,
   /\b(darker|lighter|whiter|paler|blacker|browner|tanner)\s+(skin|complexion|skin\s?tone)\b/,
+  /\b(skin|complexion|skin\s?tone)\s+(a\s+(little|bit|touch)\s+)?(darker|lighter|whiter|paler|blacker|browner|tanner)\b/,
   /\b(change|swap|switch|replace)\w*\s+(my|the|her|his|their)?\s*(skin|complexion)\s*(tone|colou?r)?\b/,
   new RegExp(`\\b(make|turn)\\s+(me|my face|him|her)\\s+(look\\s+)?(like\\s+)?(an?\\s+)?(${RACE_WORDS})\\b`),
   new RegExp(`\\b(i|i'd|me|us|we|him|her|skin|face|complexion)\\s+(to\\s+|can\\s+|could\\s+|should\\s+)?${LOOKS_LIKE}`),

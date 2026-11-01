@@ -3,6 +3,8 @@ import { asksToChangeSkinTone } from "../src/lib/skin-tone-guard.ts";
 
 describe("asksToChangeSkinTone", () => {
   it.each([
+    "make my skin darker",
+    "my complexion a bit lighter",
     "do a blackface look",
     "Brown-face for halloween",
     "darken my skin a lot",
