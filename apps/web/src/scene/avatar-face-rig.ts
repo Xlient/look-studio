@@ -68,15 +68,19 @@ export function headBounds(surface: HeadSurface) {
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
   for (let i = 0; i < surface.weights.length; i += 1) {
     if ((surface.weights[i] ?? 0) >= 0.5) {
       minX = Math.min(minX, surface.positions[i * 3] ?? 0);
       maxX = Math.max(maxX, surface.positions[i * 3] ?? 0);
       minY = Math.min(minY, surface.positions[i * 3 + 1] ?? 0);
       maxY = Math.max(maxY, surface.positions[i * 3 + 1] ?? 0);
+      minZ = Math.min(minZ, surface.positions[i * 3 + 2] ?? 0);
+      maxZ = Math.max(maxZ, surface.positions[i * 3 + 2] ?? 0);
     }
   }
-  return minX <= maxX ? { minX, maxX, minY, maxY } : null;
+  return minX <= maxX ? { minX, maxX, minY, maxY, minZ, maxZ } : null;
 }
 
 // Morph targets offset raw geometry, which reaches the world through the skin and not the mesh's own transform.
