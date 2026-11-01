@@ -1,9 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { EXPRESSION, EXPRESSION_COUNT, stepExpressions, toAvatarExpressions, writeExpressions } from "../src/tracking/expressions.ts";
+import { EXPRESSION, EXPRESSION_COUNT, mouthOpenness, stepExpressions, toAvatarExpressions, writeExpressions } from "../src/tracking/expressions.ts";
 
 const fresh = () => new Float32Array(EXPRESSION_COUNT);
 
 describe("writeExpressions", () => {
+  it("opens the mouth for speech that parts the lips while the jaw barely moves", () => {
+    const talking = writeExpressions(fresh(), [
+      { categoryName: "jawOpen", score: 0.08 },
+      { categoryName: "mouthLowerDownLeft", score: 0.35 },
+      { categoryName: "mouthLowerDownRight", score: 0.33 },
+      { categoryName: "mouthUpperUpLeft", score: 0.2 },
+      { categoryName: "mouthUpperUpRight", score: 0.2 },
+    ]);
+    expect(talking[EXPRESSION.jawOpen]).toBeGreaterThan(0.6);
+    const jawOnly = writeExpressions(fresh(), [{ categoryName: "jawOpen", score: 0.08 }]);
+    expect(jawOnly[EXPRESSION.jawOpen]).toBeLessThan(0.15);
+  });
+
+  it("keeps a resting mouth closed and lets mouthClose pull it shut", () => {
+    const resting = writeExpressions(fresh(), [
+      { categoryName: "jawOpen", score: 0.03 },
+      { categoryName: "mouthLowerDownLeft", score: 0.02 },
+      { categoryName: "mouthLowerDownRight", score: 0.02 },
+    ]);
+    expect(resting[EXPRESSION.jawOpen]).toBe(0);
+    expect(mouthOpenness(0.3, 0, 0, 0)).toBeCloseTo(0.3);
+    expect(mouthOpenness(0.3, 0, 0, 0.4)).toBeCloseTo(0.1);
+    expect(mouthOpenness(0.1, 0.5, 0.25, 0)).toBeCloseTo(0.5);
+  });
+
+  it("rounds the lips for funnel and pucker shapes", () => {
+    expect(writeExpressions(fresh(), [{ categoryName: "mouthPucker", score: 0.6 }])[EXPRESSION.mouthRound]).toBeCloseTo(1);
+    expect(writeExpressions(fresh(), [{ categoryName: "mouthFunnel", score: 0.375 }])[EXPRESSION.mouthRound]).toBeCloseTo(0.5);
+    expect(writeExpressions(fresh(), [{ categoryName: "mouthFunnel", score: 0.1 }])[EXPRESSION.mouthRound]).toBe(0);
+  });
+
   it("combines sides, applies the dead zone, and ignores other shapes", () => {
     const out = writeExpressions(fresh(), [
       { categoryName: "mouthSmileLeft", score: 0.7 },
