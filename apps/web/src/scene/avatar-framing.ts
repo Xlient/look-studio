@@ -1,16 +1,21 @@
-export interface ModelBounds {
+export interface Bounds {
+  minX: number;
+  maxX: number;
   minY: number;
   maxY: number;
-  centerX: number;
-  centerZ: number;
-  depth: number;
+  minZ: number;
+  maxZ: number;
 }
 
+export type FrameMode = "head" | "body";
+
 export interface CameraFrame {
+  mode: FrameMode;
   x: number;
   y: number;
   z: number;
   lookY: number;
+  lookZ: number;
   near: number;
   far: number;
 }
@@ -20,22 +25,31 @@ export const HEAD_SHARE = 1 / 3;
 export const FACE_FROM_TOP = 0.4;
 const BUST_SHARE = 0.42;
 const HEAD_ROOM = 0.05;
-const MAX_HEAD_SHARE_OF_BODY = 0.4;
 
-function place(bounds: ModelBounds, visible: number, lookY: number, fovDeg: number, x: number): CameraFrame {
-  const distance = visible / 2 / Math.tan((fovDeg * Math.PI) / 360) + bounds.depth / 2;
-  return { x, y: lookY, z: bounds.centerZ + distance, lookY, near: Math.max(0.01, distance / 100), far: distance * 10 };
+function place(mode: FrameMode, box: Bounds, visible: number, lookY: number, fovDeg: number): CameraFrame {
+  const centerZ = (box.minZ + box.maxZ) / 2;
+  const distance = visible / 2 / Math.tan((fovDeg * Math.PI) / 360) + (box.maxZ - box.minZ) / 2;
+  return {
+    mode,
+    x: (box.minX + box.maxX) / 2,
+    y: lookY,
+    z: centerZ + distance,
+    lookY,
+    lookZ: centerZ,
+    near: Math.max(0.01, distance / 100),
+    far: distance * 10,
+  };
 }
 
-// headY is the head bone, which rigs put at the base of the skull; without a usable one, frame the top of the body.
-export function frameBust(bounds: ModelBounds, head: { x: number; y: number } | null, fovDeg: number): CameraFrame {
-  const height = bounds.maxY - bounds.minY;
-  const headHeight = head === null ? 0 : bounds.maxY - head.y;
-  if (head !== null && headHeight > 0 && headHeight <= height * MAX_HEAD_SHARE_OF_BODY) {
+// head holds the vertices skinned to the head bone; the whole-model box can include stray geometry, so it is only a fallback.
+export function frameBust(body: Bounds, head: Bounds | null, fovDeg: number): CameraFrame {
+  const headHeight = head === null ? 0 : head.maxY - head.minY;
+  if (head !== null && headHeight > 0 && Number.isFinite(headHeight)) {
     const visible = headHeight / HEAD_SHARE;
-    const faceY = head.y + headHeight / 2;
-    return place(bounds, visible, faceY - visible * (0.5 - FACE_FROM_TOP), fovDeg, head.x);
+    const faceY = (head.minY + head.maxY) / 2;
+    return place("head", head, visible, faceY - visible * (0.5 - FACE_FROM_TOP), fovDeg);
   }
-  const visible = Math.max(height, 0.01) * BUST_SHARE;
-  return place(bounds, visible, bounds.maxY + height * HEAD_ROOM - visible / 2, fovDeg, bounds.centerX);
+  const height = Math.max(body.maxY - body.minY, 0.01);
+  const visible = height * BUST_SHARE;
+  return place("body", body, visible, body.maxY + height * HEAD_ROOM - visible / 2, fovDeg);
 }
