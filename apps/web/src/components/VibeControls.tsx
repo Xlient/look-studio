@@ -15,6 +15,11 @@ function toggled<T extends string>(current: T | undefined, option: T): T | undef
   return current === option ? undefined : option;
 }
 
+function skinSummary(skin: SkinChoice): string {
+  const chosen = [skin.tone, skin.undertone].filter((part) => part !== undefined);
+  return chosen.length === 0 ? "Match my skin tone (optional)" : `Matching: ${chosen.join(", ")}`;
+}
+
 export default function VibeControls({ occasion, vibe, disabled, onOccasion, onVibe, skin, onSkin }: VibeControlsProps) {
   const label = vibeLabel(vibe);
   return (
@@ -33,40 +38,43 @@ export default function VibeControls({ occasion, vibe, disabled, onOccasion, onV
           </button>
         ))}
       </div>
-      <div className="vibe__skin">
-        <span id="skin-tone-label">Your skin tone</span>
-        <div className="chips" role="group" aria-labelledby="skin-tone-label">
-          {SKIN_TONES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="chip"
-              aria-pressed={skin.tone === option}
-              disabled={disabled}
-              onClick={() => onSkin({ ...skin, tone: toggled(skin.tone, option) })}
-            >
-              {option}
-            </button>
-          ))}
+      <details className="vibe__panel">
+        <summary>{skinSummary(skin)}</summary>
+        <div className="vibe__skin">
+          <span id="skin-tone-label">Your skin tone</span>
+          <div className="chips" role="group" aria-labelledby="skin-tone-label">
+            {SKIN_TONES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="chip"
+                aria-pressed={skin.tone === option}
+                disabled={disabled}
+                onClick={() => onSkin({ ...skin, tone: toggled(skin.tone, option) })}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="vibe__skin">
-        <span id="undertone-label">Your undertone</span>
-        <div className="chips" role="group" aria-labelledby="undertone-label">
-          {UNDERTONES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="chip"
-              aria-pressed={skin.undertone === option}
-              disabled={disabled}
-              onClick={() => onSkin({ ...skin, undertone: toggled(skin.undertone, option) })}
-            >
-              {option}
-            </button>
-          ))}
+        <div className="vibe__skin">
+          <span id="undertone-label">Your undertone</span>
+          <div className="chips" role="group" aria-labelledby="undertone-label">
+            {UNDERTONES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="chip"
+                aria-pressed={skin.undertone === option}
+                disabled={disabled}
+                onClick={() => onSkin({ ...skin, undertone: toggled(skin.undertone, option) })}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </details>
       <div className="vibe__dial">
         <label htmlFor="vibe-dial">Vibe</label>
         <span aria-hidden="true">subtle</span>

@@ -836,6 +836,16 @@ body {
   margin-bottom: 6px;
 }
 
+.vibe__panel summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.vibe__panel[open] {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
 .vibe__skin {
   display: flex;
   flex-direction: column;
