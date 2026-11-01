@@ -1161,7 +1161,13 @@ body {
   }
 }
 
+.player__deck {
+  flex-wrap: wrap;
+}
+
+/* Notes sit inside the button row; order moves them below the buttons instead of between them. */
 .player__note {
+  order: 1;
   margin: 0;
   flex-basis: 100%;
   font-size: 0.85rem;

@@ -1,14 +1,13 @@
 import { AmbientLight, Bone, Box3, Color, DirectionalLight, Euler, Mesh, PerspectiveCamera, Quaternion, Scene, Texture, Vector3 } from "three";
 import type { Group, Material, Object3D } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { frameBust } from "./avatar-framing.ts";
 import { createRigPose, findRigBones, writeRigPose } from "./avatar-rig.ts";
 import type { AvatarMotion, BoneTurn } from "./avatar-rig.ts";
 import type { FaceRig } from "./avatar-face-rig.ts";
 
 const BACKGROUND = 0xdfe7ff;
 const FOV_DEG = 30;
-const BUST_SHARE = 0.42;
-const HEAD_ROOM = 0.05;
 
 export interface AvatarView {
   readonly scene: Scene;
@@ -29,7 +28,7 @@ interface DrivenBone {
   rest: Quaternion;
 }
 
-function frameBust(model: Group, camera: PerspectiveCamera) {
+function frameCamera(model: Group, head: Object3D | null, camera: PerspectiveCamera) {
   model.updateMatrixWorld(true);
   const box = new Box3().setFromObject(model);
   if (box.isEmpty()) {
@@ -37,15 +36,17 @@ function frameBust(model: Group, camera: PerspectiveCamera) {
     camera.lookAt(0, 1.5, 0);
     return;
   }
-  const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
-  const visible = size.y * BUST_SHARE;
-  const targetY = box.max.y + size.y * HEAD_ROOM - visible / 2;
-  const distance = visible / 2 / Math.tan((FOV_DEG * Math.PI) / 360) + size.z / 2;
-  camera.near = Math.max(0.01, distance / 100);
-  camera.far = distance * 10;
-  camera.position.set(center.x, targetY, center.z + distance);
-  camera.lookAt(center.x, targetY, center.z);
+  const headAt = head?.getWorldPosition(new Vector3()) ?? null;
+  const frame = frameBust(
+    { minY: box.min.y, maxY: box.max.y, centerX: center.x, centerZ: center.z, depth: box.max.z - box.min.z },
+    headAt === null ? null : { x: headAt.x, y: headAt.y },
+    FOV_DEG,
+  );
+  camera.near = frame.near;
+  camera.far = frame.far;
+  camera.position.set(frame.x, frame.y, frame.z);
+  camera.lookAt(frame.x, frame.lookY, center.z);
 }
 
 function disposeMaterial(material: Material) {
@@ -89,7 +90,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
   const spine = drive(found.spine);
 
   const camera = new PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
-  frameBust(model, camera);
+  frameCamera(model, head?.bone ?? null, camera);
 
   const rig = createRigPose();
   let faceRig: FaceRig | null = null;
