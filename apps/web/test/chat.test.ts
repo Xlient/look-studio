@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { LookSpec, WearableSpec } from "@look-studio/shared";
 import { createWearableJob, watchWearableJob } from "../src/studio/api-client.ts";
 import type { CallMeta, FetchLike } from "../src/studio/api-client.ts";
-import { clampVibe, composePrompt, contextNote, vibeLabel } from "../src/studio/prompt-compose.ts";
+import { clampVibe, composeEdit, composePrompt, contextNote, parseSkinChoice, skinLine, vibeLabel } from "../src/studio/prompt-compose.ts";
+import { loadSkinChoice, saveSkinChoice } from "../src/studio/skin-choice-store.ts";
 import { historyShortcut } from "../src/studio/shortcuts.ts";
 import type { ShortcutEvent } from "../src/studio/shortcuts.ts";
 import { createSseParser } from "../src/studio/sse.ts";
@@ -114,6 +115,51 @@ describe("prompt composition", () => {
     expect(composePrompt("gold", { occasion: null, vibe: 20 })).not.toContain("Occasion");
     expect(contextNote({ occasion: "Date night", vibe: 50 })).toBe("date night · balanced");
     expect(contextNote({ occasion: null, vibe: 0 })).toBe("subtle");
+  });
+
+  it("describes only the skin details the wearer chose", () => {
+    expect(skinLine({ tone: "deep", undertone: "warm" })).toContain("skin: deep, warm undertone.");
+    expect(skinLine({ tone: "fair" })).toContain("skin: fair.");
+    expect(skinLine({ undertone: "cool" })).toContain("skin: cool undertone.");
+    expect(skinLine({})).toBeNull();
+    expect(skinLine(undefined)).toBeNull();
+  });
+
+  it("adds the skin line to looks and edits only when chosen", () => {
+    expect(composePrompt("gold", { occasion: null, vibe: 50, skin: { tone: "tan" } })).toContain("skin: tan.");
+    expect(composePrompt("gold", { occasion: null, vibe: 50, skin: {} })).not.toContain("skin:");
+    expect(composeEdit("redder lips", { undertone: "warm" })).toMatch(/^redder lips\n.*warm undertone/);
+    expect(composeEdit("redder lips", undefined)).toBe("redder lips");
+  });
+
+  it("keeps only known skin values", () => {
+    expect(parseSkinChoice({ tone: "deep", undertone: "hot" })).toEqual({ tone: "deep" });
+    expect(parseSkinChoice("deep")).toEqual({});
+    expect(parseSkinChoice(null)).toEqual({});
+  });
+
+  it("restores a saved skin choice and clears it when empty", () => {
+    const saved = new Map<string, string>();
+    const storage = () => ({
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => void saved.set(key, value),
+      removeItem: (key: string) => void saved.delete(key),
+    });
+    expect(saveSkinChoice({ tone: "medium", undertone: "cool" }, storage)).toBe(true);
+    expect(loadSkinChoice(storage)).toEqual({ tone: "medium", undertone: "cool" });
+    expect(saveSkinChoice({}, storage)).toBe(true);
+    expect(saved.size).toBe(0);
+    expect(loadSkinChoice(storage)).toEqual({});
+  });
+
+  it("ignores a broken or unavailable saved skin choice", () => {
+    const broken = () => ({ getItem: () => "{not json", setItem: () => undefined, removeItem: () => undefined });
+    const blocked = () => {
+      throw new Error("blocked");
+    };
+    expect(loadSkinChoice(broken)).toEqual({});
+    expect(loadSkinChoice(blocked)).toEqual({});
+    expect(saveSkinChoice({ tone: "deep" }, blocked)).toBe(false);
   });
 
   it("clamps the vibe", () => {

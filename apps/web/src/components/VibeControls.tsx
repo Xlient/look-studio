@@ -1,5 +1,5 @@
-import { OCCASIONS, VIBE_MAX, VIBE_MIN, clampVibe, vibeLabel } from "../studio/prompt-compose.ts";
-import type { Occasion } from "../studio/prompt-compose.ts";
+import { OCCASIONS, SKIN_TONES, UNDERTONES, VIBE_MAX, VIBE_MIN, clampVibe, vibeLabel } from "../studio/prompt-compose.ts";
+import type { Occasion, SkinChoice } from "../studio/prompt-compose.ts";
 
 interface VibeControlsProps {
   occasion: Occasion | null;
@@ -7,9 +7,20 @@ interface VibeControlsProps {
   disabled: boolean;
   onOccasion: (occasion: Occasion | null) => void;
   onVibe: (vibe: number) => void;
+  skin: SkinChoice;
+  onSkin: (skin: SkinChoice) => void;
 }
 
-export default function VibeControls({ occasion, vibe, disabled, onOccasion, onVibe }: VibeControlsProps) {
+function toggled<T extends string>(current: T | undefined, option: T): T | undefined {
+  return current === option ? undefined : option;
+}
+
+function skinSummary(skin: SkinChoice): string {
+  const chosen = [skin.tone, skin.undertone].filter((part) => part !== undefined);
+  return chosen.length === 0 ? "Match my skin tone (optional)" : `Matching: ${chosen.join(", ")}`;
+}
+
+export default function VibeControls({ occasion, vibe, disabled, onOccasion, onVibe, skin, onSkin }: VibeControlsProps) {
   const label = vibeLabel(vibe);
   return (
     <div className="vibe">
@@ -27,6 +38,43 @@ export default function VibeControls({ occasion, vibe, disabled, onOccasion, onV
           </button>
         ))}
       </div>
+      <details className="vibe__panel">
+        <summary>{skinSummary(skin)}</summary>
+        <div className="vibe__skin">
+          <span id="skin-tone-label">Your skin tone</span>
+          <div className="chips" role="group" aria-labelledby="skin-tone-label">
+            {SKIN_TONES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="chip"
+                aria-pressed={skin.tone === option}
+                disabled={disabled}
+                onClick={() => onSkin({ ...skin, tone: toggled(skin.tone, option) })}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="vibe__skin">
+          <span id="undertone-label">Your undertone</span>
+          <div className="chips" role="group" aria-labelledby="undertone-label">
+            {UNDERTONES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="chip"
+                aria-pressed={skin.undertone === option}
+                disabled={disabled}
+                onClick={() => onSkin({ ...skin, undertone: toggled(skin.undertone, option) })}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      </details>
       <div className="vibe__dial">
         <label htmlFor="vibe-dial">Vibe</label>
         <span aria-hidden="true">subtle</span>
