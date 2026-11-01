@@ -31,7 +31,7 @@ export function useAvatarView(model: ArrayBuffer | null): AvatarViewState {
           return;
         }
         loaded = view;
-        logEvent({ event: "avatar_load", durationMs: elapsed(), bytes, meshes: view.meshCount, bones: view.boneCount, kind: view.kind, outcome: "ok" });
+        logEvent({ event: "avatar_load", durationMs: elapsed(), bytes, meshes: view.meshCount, bones: view.boneCount, frame: view.frameMode, kind: view.kind, outcome: "ok" });
         view.onFirstFrame(() => logEvent({ event: "avatar_first_frame", sinceModelMs: elapsed() }));
         setState({ status: "ready", view, warning: null });
         if (view.kind === "vrm") {

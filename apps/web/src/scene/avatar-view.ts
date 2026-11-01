@@ -4,6 +4,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { VRM_EXPRESSIONS, writeVrmWeights } from "./vrm-expressions.ts";
 import { frameBust } from "./avatar-framing.ts";
+import type { CameraFrame, FrameMode } from "./avatar-framing.ts";
+import { headBounds, readHeadSurface } from "./avatar-face-rig.ts";
 import { createRigPose, findRigBones, writeRigPose } from "./avatar-rig.ts";
 import type { AvatarMotion, BoneTurn } from "./avatar-rig.ts";
 import type { FaceRig } from "./avatar-face-rig.ts";
@@ -19,6 +21,7 @@ export interface AvatarView {
   readonly head: Object3D | null;
   readonly meshCount: number;
   readonly boneCount: number;
+  readonly frameMode: FrameMode | null;
   onFirstFrame(listener: () => void): void;
   setFaceRig(rig: FaceRig): void;
   resize(width: number, height: number): void;
@@ -31,25 +34,26 @@ interface DrivenBone {
   rest: Quaternion;
 }
 
-function frameCamera(model: Group, head: Object3D | null, camera: PerspectiveCamera) {
+function frameCamera(model: Group, head: Object3D | null, camera: PerspectiveCamera): CameraFrame | null {
   model.updateMatrixWorld(true);
   const box = new Box3().setFromObject(model);
   if (box.isEmpty()) {
     camera.position.set(0, 1.5, 2);
     camera.lookAt(0, 1.5, 0);
-    return;
+    return null;
   }
-  const center = box.getCenter(new Vector3());
-  const headAt = head?.getWorldPosition(new Vector3()) ?? null;
+  const surface = head === null ? null : readHeadSurface(model, head);
+  const headBox = surface === null ? null : headBounds(surface);
   const frame = frameBust(
-    { minY: box.min.y, maxY: box.max.y, centerX: center.x, centerZ: center.z, depth: box.max.z - box.min.z },
-    headAt === null ? null : { x: headAt.x, y: headAt.y },
+    { minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z },
+    headBox,
     FOV_DEG,
   );
   camera.near = frame.near;
   camera.far = frame.far;
   camera.position.set(frame.x, frame.y, frame.z);
-  camera.lookAt(frame.x, frame.lookY, center.z);
+  camera.lookAt(frame.x, frame.lookY, frame.lookZ);
+  return frame;
 }
 
 function disposeMaterial(material: Material) {
@@ -106,7 +110,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
   let lastPoseS: number | null = null;
 
   const camera = new PerspectiveCamera(FOV_DEG, 1, 0.01, 100);
-  frameCamera(model, vrm === null ? (head?.bone ?? null) : vrm.humanoid.getRawBoneNode("head"), camera);
+  const frame = frameCamera(model, vrm === null ? (head?.bone ?? null) : vrm.humanoid.getRawBoneNode("head"), camera);
 
   const rig = createRigPose();
   let faceRig: FaceRig | null = null;
@@ -140,6 +144,7 @@ export async function loadAvatarView(data: ArrayBuffer): Promise<AvatarView> {
     head: head?.bone ?? null,
     meshCount,
     boneCount: bones.length,
+    frameMode: frame?.mode ?? null,
     onFirstFrame(listener) {
       firstFrame = listener;
     },
