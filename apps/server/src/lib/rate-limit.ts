@@ -1,51 +1,14 @@
 import { isIP } from "node:net";
 import type { Context, Next } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import type { RateLimitDecision, RateLimiter } from "@look-studio/shared";
+import { SlidingWindowRateLimiter } from "@look-studio/core";
+import type { RateLimiter } from "@look-studio/shared";
 import { envNumber } from "../env.ts";
 import { logInfo } from "./logger.ts";
 
-interface Bucket {
-  count: number;
-  resetAt: number;
-}
+export { SlidingWindowRateLimiter as InMemoryRateLimiter };
 
-export interface RateLimiterConfig {
-  readonly max: number;
-  readonly windowMs: number;
-}
-
-export class InMemoryRateLimiter implements RateLimiter {
-  private readonly buckets = new Map<string, Bucket>();
-  private readonly config: () => RateLimiterConfig;
-  private readonly now: () => number;
-
-  constructor(config: () => RateLimiterConfig, now: () => number = Date.now) {
-    this.config = config;
-    this.now = now;
-  }
-
-  tryAcquire(key: string, cost: number): RateLimitDecision {
-    const now = this.now();
-    const { max, windowMs } = this.config();
-    const bucket = this.buckets.get(key);
-    if (!bucket || bucket.resetAt <= now) {
-      this.buckets.set(key, { count: cost, resetAt: now + windowMs });
-      return { allowed: true, retryAfterMs: 0 };
-    }
-    bucket.count += cost;
-    if (bucket.count > max) {
-      return { allowed: false, retryAfterMs: Math.max(0, bucket.resetAt - now) };
-    }
-    return { allowed: true, retryAfterMs: 0 };
-  }
-
-  reset(): void {
-    this.buckets.clear();
-  }
-}
-
-const limiter = new InMemoryRateLimiter(() => ({
+const limiter = new SlidingWindowRateLimiter(() => ({
   max: rateLimitMax(),
   windowMs: rateLimitWindowMs(),
 }));

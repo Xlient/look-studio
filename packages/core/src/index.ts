@@ -1,1 +1,12 @@
-export {};
+export { LruCache } from "./cache/lru-cache.ts";
+export type { RateLimitDecision } from "./rate-limit/decision.ts";
+export { SlidingWindowRateLimiter } from "./rate-limit/sliding-window.ts";
+export type { SlidingWindowConfig } from "./rate-limit/sliding-window.ts";
+export { TokenBucketRateLimiter } from "./rate-limit/token-bucket.ts";
+export type { TokenBucketConfig } from "./rate-limit/token-bucket.ts";
+export { CircuitBreaker, CircuitOpenError } from "./retry/circuit-breaker.ts";
+export type { CircuitBreakerConfig, CircuitState } from "./retry/circuit-breaker.ts";
+export { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy, computeBackoffMs, retryAfterFrom } from "./retry/retry-policy.ts";
+export type { AbortSignalLike, RetryExtras, RetryPolicyConfig, RetryRunOptions } from "./retry/retry-policy.ts";
+export { DAILY_WINDOW, DAY_MS, SlidingWindowBudget } from "./budget/sliding-window-budget.ts";
+export type { SpendWindowConfig } from "./budget/sliding-window-budget.ts";

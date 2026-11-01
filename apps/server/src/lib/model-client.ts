@@ -5,6 +5,7 @@ import type { RetryPolicy } from "@look-studio/shared";
 import { envNumber, requiredEnv } from "../env.ts";
 import { logInfo } from "./logger.ts";
 import { ModelError, toModelError } from "./model-errors.ts";
+import { CircuitBreaker } from "@look-studio/core";
 import { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy } from "./retry-policy.ts";
 
 export const MODEL_API_BASE_URL = "https://api.meta.ai/v1";
@@ -22,10 +23,15 @@ export function modelMaxRetries(): number {
   return envNumber("MODEL_MAX_RETRIES", 3);
 }
 
-export const defaultRetryPolicy: RetryPolicy = new ExponentialBackoffRetryPolicy(() => ({
-  maxRetries: modelMaxRetries(),
-  baseMs: BACKOFF_BASE_MS,
-}));
+// Five model calls in a row that fail even after retries mean the API is down; fail fast for 20 s instead of queueing users.
+const modelCircuit = new CircuitBreaker(() => ({ failureThreshold: 5, cooldownMs: 20_000 }));
+
+export const defaultRetryPolicy: RetryPolicy = new ExponentialBackoffRetryPolicy(
+  () => ({ maxRetries: modelMaxRetries(), baseMs: BACKOFF_BASE_MS }),
+  undefined,
+  undefined,
+  { breaker: modelCircuit, onOpen: (open) => new ModelError("unavailable", { model: "model-api", retryAfterMs: open.retryAfterMs }) },
+);
 
 function toTokenCount(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {

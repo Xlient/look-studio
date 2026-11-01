@@ -41,7 +41,7 @@ describe("InMemoryRateLimiter", () => {
 
 describe("InMemoryBudgetTracker", () => {
   it("records spend and reports remaining and exceeded", () => {
-    const tracker = new InMemoryBudgetTracker(() => 5, () => "2026-01-01");
+    const tracker = new InMemoryBudgetTracker(() => 5, () => 0);
     expect(tracker.record(2)).toBe(2);
     expect(tracker.remaining()).toBe(3);
     expect(tracker.isExceeded()).toBe(false);
@@ -50,12 +50,12 @@ describe("InMemoryBudgetTracker", () => {
     expect(tracker.remaining()).toBe(0);
   });
 
-  it("rolls over on a new day", () => {
-    let day = "2026-01-01";
-    const tracker = new InMemoryBudgetTracker(() => 5, () => day);
+  it("frees spend once it is a day old", () => {
+    let now = 0;
+    const tracker = new InMemoryBudgetTracker(() => 5, () => now);
     tracker.record(5);
     expect(tracker.isExceeded()).toBe(true);
-    day = "2026-01-02";
+    now = 24 * 60 * 60_000;
     expect(tracker.isExceeded()).toBe(false);
     expect(tracker.remaining()).toBe(5);
   });
