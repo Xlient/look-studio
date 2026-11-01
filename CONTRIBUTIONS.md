@@ -34,9 +34,10 @@ them at the team's request, as marked in the table below.
 | Favorites | IndexedDB library with export and import | 2026-10-28 |
 | Eval runner | `pnpm eval` runner with run folders, CSV, and summaries | 2026-10-28 |
 | Core limits | `packages/core`: LRU cache, sliding-window and token-bucket rate limiters, retry with backoff and a circuit breaker, and a rolling 24-hour budget, now used by the server. Planned as hand-written work, then handed to an AI coding agent. | 2026-11-01 |
+| Job queue | `packages/core` priority job queue with a concurrency limit, run-time timeouts, cancellation, progress, a waiting limit, and graceful shutdown; avatar builds run three at a time and stop cleanly on shutdown. Planned as hand-written work, then handed to an AI coding agent. | 2026-11-01 |
 | Edit eval | 100 labelled edit requests, an edit-accuracy harness with bootstrap intervals, latency and cost, and an ambiguity rule in the edit prompt. Planned as hand-written work, then handed to an AI coding agent. | 2026-11-01 |
 
-Not yet built: the job queue and pose filters in `packages/core`, the agent
+Not yet built: the pose median filter in `packages/core`, the agent
 loops (Look Director, Fit Critic), real 3D wearable generation, and SAM
 segmentation.
 

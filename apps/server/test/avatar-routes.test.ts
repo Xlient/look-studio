@@ -3,7 +3,7 @@ import { createApp } from "../src/app.ts";
 import { createContainer } from "../src/container.ts";
 import { AvatarStudio } from "../src/lib/avatar-studio.ts";
 import { FakeAvatarProvider, FakeConceptService } from "../src/lib/avatar-fakes.ts";
-import { InlineJobQueue } from "../src/lib/inline-job-queue.ts";
+import { PriorityJobQueue } from "@look-studio/core";
 import { InMemoryRateLimiter, resetRateLimiter } from "../src/lib/rate-limit.ts";
 import { ClientBudgets, InMemoryBudgetTracker, resetSpendLedger } from "../src/lib/spend-cap.ts";
 import type { ModerationService } from "../src/lib/moderation.ts";
@@ -22,7 +22,7 @@ function app(moderation: ModerationService = { check: async () => ({ allowed: tr
     moderation,
     concepts: new FakeConceptService(),
     provider: new FakeAvatarProvider(),
-    queue: new InlineJobQueue(),
+    queue: new PriorityJobQueue({ concurrency: 3, maxQueued: 30 }),
     now: Date.now,
     newId: () => String((id += 1)),
     onAvatarBuilt: () => {},
@@ -113,7 +113,7 @@ describe("avatar routes", () => {
       moderation: { check: async () => ({ allowed: true, category: "ok" }) },
       concepts: new FakeConceptService(),
       provider: new FakeAvatarProvider(),
-      queue: new InlineJobQueue(),
+      queue: new PriorityJobQueue({ concurrency: 3, maxQueued: 30 }),
       now: Date.now,
       newId: () => crypto.randomUUID(),
       onAvatarBuilt: (budget) => void budget.record(0.7),

@@ -3,7 +3,7 @@ import type { AvatarJobStatus, BudgetTracker } from "@look-studio/shared";
 import { AvatarBlockedError, AvatarStudio, failureMessage, overallProgress } from "../src/lib/avatar-studio.ts";
 import type { AvatarStudioDeps } from "../src/lib/avatar-studio.ts";
 import { FakeConceptService, emptyGlb } from "../src/lib/avatar-fakes.ts";
-import { InlineJobQueue } from "../src/lib/inline-job-queue.ts";
+import { JobTimeoutError, PriorityJobQueue, QueueClosedError, QueueFullError } from "@look-studio/core";
 import type { AvatarBuild, AvatarModelProvider, BuildStage } from "../src/lib/meshy-avatar.ts";
 import { MeshyError } from "../src/lib/meshy-client.ts";
 import { toVerdict } from "../src/lib/moderation.ts";
@@ -42,7 +42,7 @@ function studio(overrides: Partial<AvatarStudioDeps> = {}, clock = { t: 0 }) {
     moderation: { check: async () => ({ allowed: true, category: "ok" }) },
     concepts: new FakeConceptService(),
     provider: deferredProvider().provider,
-    queue: new InlineJobQueue(),
+    queue: new PriorityJobQueue({ concurrency: 3, maxQueued: 30 }),
     now: () => clock.t,
     newId: () => String((id += 1)),
     onAvatarBuilt: () => {
@@ -88,6 +88,14 @@ describe("avatar progress and messages", () => {
     expect(toVerdict({ allowed: true, category: "ok" })).toEqual({ allowed: true, category: "ok" });
     expect(toVerdict({ allowed: true, category: "sexual" })).toEqual({ allowed: false, category: "sexual" });
     expect(toVerdict({ allowed: false, category: "ok" })).toEqual({ allowed: false, category: "other_unsafe" });
+  });
+});
+
+describe("failureMessage for queue errors", () => {
+  it("explains a full queue, a timeout, and a restart", () => {
+    expect(failureMessage(new QueueFullError())).toMatch(/busy/);
+    expect(failureMessage(new JobTimeoutError(1_000))).toMatch(/too long/);
+    expect(failureMessage(new QueueClosedError())).toMatch(/restarted/);
   });
 });
 
