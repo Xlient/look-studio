@@ -14,8 +14,9 @@ TBD.
 
 The first commit is dated 2026-10-27. All application code so far was written
 by AI coding agents working under the team's direction, with every change
-reviewed by the team through pull requests. The hand-written algorithms planned
-for `packages/core` are not implemented yet.
+reviewed by the team through pull requests. The algorithms in `packages/core`
+were planned as hand-written work; because of time, an AI coding agent wrote
+them at the team's request, as marked in the table below.
 
 | Area | What was built | First commit |
 | --- | --- | --- |
