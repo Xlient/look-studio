@@ -31,7 +31,7 @@ export function buildConceptPrompt(description: string, hasPhoto: boolean): stri
   return [
     "Full-body character design for a 3D avatar, front view, standing in an A-pose with arms angled down and away from the body,",
     "feet apart, whole body in frame, plain light grey background, even flat lighting, no shadows, no text.",
-    "Stylised toon look with clean shapes, separated limbs, and a simple, clearly drawn face with large eyes and a visible mouth.",
+    "Stylised toon look with clean shapes, separated limbs, and a simple, clearly drawn face with large open eyes, mouth closed, and a neutral expression.",
     hasPhoto
       ? "Use the attached photo only for outfit, colours, and accessories. Do not copy the person's face, skin tone, or likeness; invent an original character."
       : "Invent an original character.",

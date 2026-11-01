@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { AVATAR_DESCRIPTION_MAX } from "@look-studio/shared";
 import type { AvatarConcept } from "@look-studio/shared";
 import { BUILD_NOTE, buildingLabel } from "../studio/avatar-flow.ts";
+import { MODEL_FILE_TYPES, checkModelFile, modelFileMessage } from "../studio/model-file.ts";
 import { PHOTO_TYPES, checkPhoto, photoProblemMessage, readPhoto } from "../studio/photo.ts";
 import { useAvatarBuilder } from "../studio/use-avatar-builder.ts";
 import Window from "./Window.tsx";
@@ -83,13 +84,62 @@ function DescribeForm({ error, onDraw }: { error: string | null; onDraw: (descri
   );
 }
 
+function LoadModel({ onModel }: { onModel: (model: ArrayBuffer) => void }) {
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async (file: File | undefined) => {
+    setError(null);
+    if (file === undefined) {
+      return;
+    }
+    const problem = checkModelFile(file);
+    if (problem !== null) {
+      setError(modelFileMessage(problem));
+      return;
+    }
+    try {
+      onModel(await file.arrayBuffer());
+    } catch {
+      setError("That file couldn't be read.");
+    }
+  };
+
+  return (
+    <div className="avatar__load">
+      <label className="btn btn--small btn--file">
+        Load VRM or GLB
+        <input
+          type="file"
+          accept={MODEL_FILE_TYPES.join(",")}
+          className="sr-only"
+          onChange={(event) => {
+            void load(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+      </label>
+      <p className="avatar__note">Have a VRM from VRoid Studio or Blender? Load it for full face expressions. It stays on your device.</p>
+      {error !== null && (
+        <p className="avatar__error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function AvatarWindow({ onModel }: { onModel: (model: ArrayBuffer) => void }) {
   const { flow, draw, pick, back, build, retryDownload, stop } = useAvatarBuilder(onModel);
 
   return (
     <Window id="avatar" title="Avatar Maker" icon="🧸" flavor="lime" className="win--avatar">
       <div className="avatar" aria-live="polite">
-        {flow.step === "describe" && <DescribeForm error={flow.error} onDraw={draw} />}
+        {flow.step === "describe" && (
+          <>
+            <DescribeForm error={flow.error} onDraw={draw} />
+            <LoadModel onModel={onModel} />
+          </>
+        )}
         {flow.step === "drawing" && (
           <div className="avatar__wait">
             <p role="status">Muse Image is drawing 3 concepts…</p>
