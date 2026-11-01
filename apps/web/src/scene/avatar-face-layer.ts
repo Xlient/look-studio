@@ -81,13 +81,13 @@ export function drawEye(ctx: CanvasRenderingContext2D, size: number, blink: numb
 }
 
 // The mouth plane is twice the mouth's width, centred under the top lip so the jaw can open downward.
-export function drawMouth(ctx: CanvasRenderingContext2D, size: number, jaw: number, smile: number, mode: FaceLayerMode) {
+export function drawMouth(ctx: CanvasRenderingContext2D, size: number, jaw: number, smile: number, round: number, mode: FaceLayerMode) {
   ctx.clearRect(0, 0, size, size);
   const cx = size / 2;
   const top = size * 0.4;
-  const halfWidth = size * 0.25 * (1 - jaw * 0.15 + smile * 0.1);
-  if (jaw > 0) {
-    const depth = size * 0.05 + jaw * size * 0.3;
+  const halfWidth = size * 0.25 * (1 - jaw * 0.15 + smile * 0.1 * (1 - round)) * (1 - round * 0.45);
+  if (jaw > 0 || round > 0) {
+    const depth = size * 0.05 + jaw * size * 0.3 + round * size * 0.08;
     ctx.fillStyle = MOUTH_DARK;
     ctx.beginPath();
     ctx.ellipse(cx, top + depth / 2, halfWidth, depth / 2, 0, 0, Math.PI * 2);
@@ -187,10 +187,13 @@ export function createFaceLayer(parent: Object3D, anchors: FaceAnchors, height: 
       const right = quantize(expressions[EXPRESSION.blinkB] ?? 0);
       const jaw = quantize(expressions[EXPRESSION.jawOpen] ?? 0);
       const smile = quantize(expressions[EXPRESSION.smile] ?? 0);
+      const round = quantize(expressions[EXPRESSION.mouthRound] ?? 0);
       const drawn = mode === "drawn";
       lastLeft = refresh(eyeLeft, left, lastLeft, (ctx) => drawEye(ctx, CANVAS_SIZE, left, mode, anchors.lidLeft), drawn || left > 0);
       lastRight = refresh(eyeRight, right, lastRight, (ctx) => drawEye(ctx, CANVAS_SIZE, right, mode, anchors.lidRight), drawn || right > 0);
-      lastMouth = refresh(mouth, jaw * 1000 + smile, lastMouth, (ctx) => drawMouth(ctx, CANVAS_SIZE, jaw, smile, mode), drawn || jaw > 0);
+      const step = (value: number) => Math.round(value * STEPS);
+      const mouthKey = (step(jaw) * (STEPS + 1) + step(smile)) * (STEPS + 1) + step(round);
+      lastMouth = refresh(mouth, mouthKey, lastMouth, (ctx) => drawMouth(ctx, CANVAS_SIZE, jaw, smile, round, mode), drawn || jaw > 0 || round > 0);
     },
   };
 }
