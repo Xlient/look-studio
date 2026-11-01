@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["run.ts", "lib", "test"]
+  "include": ["run.ts", "lib", "harness", "test"]
 }

@@ -32,6 +32,7 @@ for `packages/core` are not implemented yet.
 | Undo and redo | Bounded command stack with exact restores | 2026-10-28 |
 | Favorites | IndexedDB library with export and import | 2026-10-28 |
 | Eval runner | `pnpm eval` runner with run folders, CSV, and summaries | 2026-10-28 |
+| Edit eval | 100 labelled edit requests, an edit-accuracy harness with bootstrap intervals, latency and cost, and an ambiguity rule in the edit prompt. Planned as hand-written work, then handed to an AI coding agent. | 2026-11-01 |
 
 Not yet built: the `packages/core` algorithms, the agent loops (Look Director,
 Fit Critic, Edit Interpreter), the eval harness and its metrics, real 3D

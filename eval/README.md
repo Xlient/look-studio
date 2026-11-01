@@ -51,3 +51,24 @@ Each run writes `eval/results/<suite>-<UTC time>/`:
 
 The command exits 0 when the run completes, even if cases failed, and 1 for setup
 errors such as a missing file or a harness without `name` and `runCase`.
+
+## Edit benchmark
+
+`eval/cases/edit.json` holds 100 labelled edit requests against three fixed
+looks in `eval/harness/edit-looks.ts`. Each case expects a list of edits, an
+`"unresolved"` answer (ambiguous or missing target), or `"refused"` (a skin
+tone change, caught before any model call). The harness calls the real Muse
+Spark edit service, so it needs `MODEL_API_KEY` and spends a little budget per
+case.
+
+```bash
+pnpm eval --harness eval/harness/edit.ts --cases eval/cases/edit.json --concurrency 4
+```
+
+An expectation names the op and target and can add checks against the current
+look: a colour `family`, a `shade` (lighter or darker), an `opacity` direction,
+a scale `factor` direction, a `move` direction, or allowed wearable `types` for
+an add. A case is an exact match when every expectation is met and there are no
+extra edits. The summary reports pass rate and exact match with 95% bootstrap
+intervals (seeded, so reruns of the same results agree), command recall and
+precision, latency p50 and p95, and cost.
