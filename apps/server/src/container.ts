@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { TokenBucketRateLimiter } from "@look-studio/core";
+import { PriorityJobQueue, TokenBucketRateLimiter } from "@look-studio/core";
 import type { BudgetTracker, RateLimiter, RetryPolicy } from "@look-studio/shared";
 import { FakeAvatarCheckService, MuseAvatarCheckService } from "./lib/avatar-check.ts";
 import type { AvatarCheckService } from "./lib/avatar-check.ts";
 import { AvatarStudio } from "./lib/avatar-studio.ts";
 import type { AvatarService } from "./lib/avatar-studio.ts";
 import { FakeAvatarProvider, FakeConceptService } from "./lib/avatar-fakes.ts";
-import { InlineJobQueue } from "./lib/inline-job-queue.ts";
 import { createMeshyClient } from "./lib/meshy-client.ts";
 import { MeshyAvatarProvider, abortableSleep } from "./lib/meshy-avatar.ts";
 import { createModelClient, defaultRetryPolicy } from "./lib/model-client.ts";
@@ -63,12 +62,15 @@ const defaultAvatarCheckLimiter: RateLimiter = new InMemoryRateLimiter(() => ({
 // Muse Image allows 150 requests per minute.
 const imageRateLimiter: RateLimiter = new TokenBucketRateLimiter(() => ({ capacity: 150, refillPerSecond: 150 / 60 }));
 
+// Meshy builds take minutes; run a few at once and let the rest wait their turn.
+export const avatarQueue = new PriorityJobQueue({ concurrency: 3, maxQueued: 30 });
+
 function fakeAvatarStudio(): AvatarService {
   return new AvatarStudio({
     moderation: new AllowAllModeration(),
     concepts: new FakeConceptService(),
     provider: new FakeAvatarProvider(),
-    queue: new InlineJobQueue(),
+    queue: avatarQueue,
     now: Date.now,
     newId: () => randomUUID(),
     onAvatarBuilt: () => {},
@@ -144,7 +146,7 @@ function liveAvatarStudio(base: Container): AvatarService {
       sleep: abortableSleep,
       now: Date.now,
     }),
-    queue: new InlineJobQueue(),
+    queue: avatarQueue,
     now: Date.now,
     newId: () => randomUUID(),
     onAvatarBuilt: (budget) => budget.record(meshyCostUsd()),

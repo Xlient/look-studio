@@ -1,3 +1,4 @@
+import { JobTimeoutError, QueueClosedError, QueueFullError } from "@look-studio/core";
 import { AVATAR_CONCEPT_COUNT } from "@look-studio/shared";
 import type { AvatarConcept, AvatarJobStatus, BudgetTracker, JobQueue } from "@look-studio/shared";
 import { logInfo } from "./logger.ts";
@@ -47,6 +48,15 @@ export function failureMessage(error: unknown): string {
       default:
         return "The 3D service is unavailable. Try again later.";
     }
+  }
+  if (error instanceof QueueFullError) {
+    return "Avatar builds are busy right now. Try again in a few minutes.";
+  }
+  if (error instanceof JobTimeoutError) {
+    return "The 3D build took too long. Try again.";
+  }
+  if (error instanceof QueueClosedError) {
+    return "The server restarted during the build. Try again.";
   }
   return "Something went wrong building the avatar.";
 }
@@ -209,7 +219,7 @@ export class AvatarStudio implements AvatarService {
         this.update(job, { jobId, stage: "ready", progress: 100 });
       },
       (error: unknown) => {
-        logInfo({ event: "avatar_job_failed", jobId, totalMs: totalMs(), error: error instanceof MeshyError ? error.kind : "unknown" });
+        logInfo({ event: "avatar_job_failed", jobId, totalMs: totalMs(), error: error instanceof MeshyError ? error.kind : error instanceof Error ? error.name : "unknown" });
         this.update(job, { jobId, stage: "failed", progress: job.status.progress, error: failureMessage(error) });
       },
     );

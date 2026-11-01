@@ -10,3 +10,7 @@ export { BACKOFF_BASE_MS, ExponentialBackoffRetryPolicy, computeBackoffMs, retry
 export type { AbortSignalLike, RetryExtras, RetryPolicyConfig, RetryRunOptions } from "./retry/retry-policy.ts";
 export { DAILY_WINDOW, DAY_MS, SlidingWindowBudget } from "./budget/sliding-window-budget.ts";
 export type { SpendWindowConfig } from "./budget/sliding-window-budget.ts";
+export { JobCancelledError, JobTimeoutError, QueueClosedError, QueueFullError } from "./queue/job-errors.ts";
+export { PriorityHeap } from "./queue/priority-heap.ts";
+export { PriorityJobQueue } from "./queue/job-queue.ts";
+export type { JobOptions, JobProgress, JobQueueConfig, JobRun, QueuedJob, Timers } from "./queue/job-queue.ts";
